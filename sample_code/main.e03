@@ -1,0 +1,32 @@
+================================================
+  sample for efpp, ver.__EFPPVER__
+================================================
+
+program main
+  use constants_m
+  use namelist_m
+  implicit none
+
+  type(TIME_) :: t
+  logical :: just_once = .true.
+
+  __debug_print:'start'
+  call namelist__read
+  __debug_print:'namelist_read called'
+
+  t.nloop = 0
+  t.time = 0.0_DR
+  do while ( t.nloop < namelist__integer('Loop_end') )
+     ==<just_once>==
+       ! this part is called only once.
+     ==</just_once>==
+
+     ==============
+       computation
+     ==============
+     __debug_print:'computation called'
+     t.nloop += 1
+     t.time += t.dt
+  end do
+
+end program main

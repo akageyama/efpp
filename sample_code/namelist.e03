@@ -1,0 +1,90 @@
+================================================
+  sample for efpp, ver.__EFPPVER__
+================================================
+
+!*******************************************************************
+module namelist_m
+!*******************************************************************
+  use constants_m
+  implicit none
+  private
+  public :: & !< routines >!
+            namelist__integer,  &
+            namelist__logical,  &
+            namelist__read
+
+  logical, save :: Flag_read_done = .false.
+
+  inte(SI) :: Loop_end, Max_minutes
+  logical :: Debug
+
+  namelist /data00/ Loop_end, Max_minutes
+  namelist /data01/ Debug
+
+
+contains
+
+
+!______________________________________________________public__
+!
+  function namelist__integer(variable)
+    char(len=*) <in> :: variable
+    inte(SI) :: namelist__integer
+!______________________________________________________________
+!
+    call ut__assert(Flag_read_done,  &
+                    '__FILE__/__ROUTINE__: Read namelist file first.')
+
+    select case (variable)
+      case                 ('Loop_end')
+         namelist__integer = Loop_end
+      case                 ('Max_minutes')
+         namelist__integer = Max_minutes
+      case default
+         call ut__fatal('__FILE__/__ROUTINE__: case error.')
+    end select
+
+  end function namelist__integer
+
+
+!______________________________________________________public__
+!
+  function namelist__logical(variable)
+    char(len=*) <in> :: variable
+    logical :: namelist__logical
+!______________________________________________________________
+!
+    call ut__assert(Flag_read_done,  &
+                    '__FILE__/__ROUTINE__: Read namelist file first.')
+
+    select case (variable)
+      case                 ('Debug')
+         namelist__logical = Debug
+      case default
+         call ut__fatal('__FILE__/__ROUTINE__: case error.')
+      end select
+
+  end function namelist__logical
+
+
+!______________________________________________________public__
+!
+  subroutine namelist__read
+!______________________________________________________________
+!
+    char(len=100) :: filename = 'sample.namelist'
+    open(10, file=trim(filename))
+
+    read(5,nml=data00)
+    read(5,nml=data01)
+
+    write(6,data00)
+    write(6,data01)
+
+    close(10)
+
+    Flag_read_done = .true.
+
+  end subroutine namelist__read
+
+end module namelist_m

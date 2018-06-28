@@ -1,0 +1,7 @@
+
+# typedef
+     "__debug_print:"
+  => "if (namelist__logical('Verbose')) print *,"
+
+     "__EFPPVER__"
+  => "180628"
