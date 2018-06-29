@@ -33,7 +33,7 @@ contains
 !______________________________________________________________
 !
     call ut__assert(Flag_read_done,  &
-                    '__FILE__/__ROUTINE__: Read namelist file first.')
+                    '__MODULE__/__ROUTINE__: Read namelist file first.')
 
     select case (variable)
       case                 ('Loop_end')
@@ -41,7 +41,7 @@ contains
       case                 ('Max_minutes')
          namelist__integer = Max_minutes
       case default
-         call ut__fatal('__FILE__/__ROUTINE__: case error.')
+         call ut__fatal('__MODULE__/__ROUTINE__: case error.')
     end select
 
   end function namelist__integer
@@ -55,13 +55,13 @@ contains
 !______________________________________________________________
 !
     call ut__assert(Flag_read_done,  &
-                    '__FILE__/__ROUTINE__: Read namelist file first.')
+                    '__MODULE__/__ROUTINE__: Read namelist file first.')
 
     select case (variable)
       case                 ('Debug')
          namelist__logical = Debug
       case default
-         call ut__fatal('__FILE__/__ROUTINE__: case error.')
+         call ut__fatal('__MODULE__/__ROUTINE__: case error.')
       end select
 
   end function namelist__logical
