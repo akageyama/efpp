@@ -378,7 +378,7 @@ def just_once_region(lines_in):
             s += '\n'
         elif match_end:
             s = match_end.group(1)
-            s += 'just_once=.false.; end if'
+            s += 'just_once = .false. ; end if'
             s += ' ' + match_end.group(2)
             s += '\n'
         else:
@@ -418,8 +418,8 @@ def skip_counter(lines_in):
         elif match_end:
             s = match_end.group(1)
             s += 'end if; '
-            s += match_end.group(2) + '='
-            s += match_end.group(2) + '+1'
+            s += match_end.group(2) + ' = '
+            s += match_end.group(2) + ' + 1'
             s += ' ' + match_end.group(3)
             s += '\n'
         else:
