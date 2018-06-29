@@ -449,7 +449,7 @@ def routine_name_macro(lines_in):
            subroutine sub1(...) ! <= Count this as a 'subroutine'
            contains
              function fun2(...) ! <= Count this as a 'function'
-               print('__FILE__/__PROGRAM__')   ! print('main0/sub1/fun2')
+               print('__MODULE__/__PROGRAM__')   ! print('main0/sub1/fun2')
              end function fun2
            end subroutine sub1
          end program main0
@@ -499,7 +499,7 @@ def routine_name_macro(lines_in):
 
         if len(name)>0:
             progmodule_name = name[0]
-            line = line.replace('__FILE__', progmodule_name)
+            line = line.replace('__MODULE__', progmodule_name)
         if len(name)==3:
             subroufunc_name = name[1] + '/' + name[2]
             line = line.replace('__ROUTINE__', subroufunc_name)
