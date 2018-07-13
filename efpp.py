@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 #
-#  efpp.py    A preprocessor for Fortran 2003.
+#  efpp.py:
+#    Preprocessor for eFortran, a dialect of Modern Fortran.
 #
+#  developed by A. Kageyama (kage@port.kobe-u.ac.jp)
+#            on 2017.09.17, for cg-mhd project.
+#    revised on 2018.07.13, for general eFortran codes.
 #
-#     developed by A. Kageyama (kage@port.kobe-u.ac.jp)
-#               on 2017.09.17, for cg-mhd.
-#     revised by A. Kageyama on 2018.05.28 for yyz-relax.
-#     revised by S. Hosoyamada on 2018.06.26,
-#             adding new function "type_member_macro".
+#  Reference:
+#     S. Hosoyamada and A. Kageyama, A Dialect of
+#     Modern Fortran for Simulations, manuscript
+#     in preparation for AsiaSim2018, 2018.
+#
+#  Home page:
+#     https://github.com/akageyama/efpp
 #
 import re
 import sys
-
 
 #=============================================
 def block_comment(lines_in):
@@ -449,7 +454,7 @@ def routine_name_macro(lines_in):
            subroutine sub1(...) ! <= Count this as a 'subroutine'
            contains
              function fun2(...) ! <= Count this as a 'function'
-               print('__MODULE__/__ROUTINE__')   ! print('main0/sub1/fun2')
+               print('__MODULE__/__PROGRAM__')   ! print('main0/sub1/fun2')
              end function fun2
            end subroutine sub1
          end program main0
@@ -585,6 +590,38 @@ def type_member_macro(lines_in):
 
 
 #=============================================
+def check_implicit_none(filename_in, lines_in):
+#=============================================
+    """
+      Check if the line "implicit none" appears.
+    """
+    pat_comment = re.compile(r'^\s*\!.*\n')
+    pat_blank = re.compile(r'^\s*\n')
+    pat_use = re.compile(r'^([\s]*)use[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
+    pat_implicit_none = re.compile(r'^([\s]*)implicit none\s+')
+    pat_program = re.compile(r'^([\s]*)program[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
+    pat_module = re.compile(r'^([\s]*)module[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
+    search_mode_on_for_implicit_none = False
+
+    for line in lines_in:
+        if pat_comment.search(line) or pat_blank.search(line):
+            continue  # Skip comment lines.
+        if search_mode_on_for_implicit_none:
+            if pat_use.search(line):
+                continue  # Skip 'use ***' lines.
+            elif pat_implicit_none.search(line):
+                return  # O.K. this code is fine.
+            else:
+                break  # Other line appears before "implicit none"
+        elif pat_module.search(line) or pat_program.search(line):
+            search_mode_on_for_implicit_none = True
+
+    error_message = 'Error in '+filename_in+': You forgot "implicit none"\n'
+    sys.stderr.write(error_message)
+    sys.exit(1)
+
+
+#=============================================
 def kutimer_docode(lines_in):
 #=============================================
     """
@@ -715,6 +752,8 @@ def efpp(filename_in):
         lines = routine_name_macro(lines)
         lines = type_member_macro(lines)
         lines = alias_decode(lines)
+
+        check_implicit_none(filename_in, lines)
 
         for l in lines:
             print(l,end='')
