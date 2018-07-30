@@ -1,2 +1,2 @@
 # efpp
-efpp: A simple preprocessor for Modern Fortran
+efpp: A preprocessor for eFortran, a dialect of the modern Fortran
