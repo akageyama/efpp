@@ -23,6 +23,9 @@ objlist := $(addsuffix .o, $(filebase)) # => example.o
 
 FC = gfortran
 
+runme: test
+	./test
+
 
 %.F90: %.e03
 	../efpp.py $< > $@
@@ -30,7 +33,10 @@ FC = gfortran
 %.o: %.F90
 	$(FC) $(FFLAGS) -o $@ -c $<
 
-main.o: constants.o namelist.o
+main.o: constants.o time.o vecfield.o
+
+test: *.o
+	$(FC) -o test *.o
 
 
 clean:

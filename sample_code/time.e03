@@ -1,0 +1,19 @@
+================================================
+  sample for efpp, ver.__EFPPVER__
+================================================
+
+!*********************************************************
+module time_m
+!*********************************************************
+  use constants_m
+  implicit none
+  private
+  public :: time__t
+
+  type time__t
+     inte(SI) :: loop
+     real(DR) :: dt
+     real(DR) :: t
+  end type time__t
+
+end module time_m

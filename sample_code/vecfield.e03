@@ -1,0 +1,42 @@
+================================================
+  sample for efpp, ver.__EFPPVER__
+================================================
+
+!*********************************************************
+module vecfield_m
+!*********************************************************
+  use constants_m
+  implicit none
+
+  private
+  public :: vecfield__t
+  public :: operator( .dot. )
+
+  type vecfield__t
+    real(DR) :: x(GRID_NX,GRID_NY,GRID_NZ)
+    real(DR) :: y(GRID_NX,GRID_NY,GRID_NZ)
+    real(DR) :: z(GRID_NX,GRID_NY,GRID_NZ)
+  end type vecfield__t
+
+  interface operator( .dot. )
+     module procedure operator_dot_product
+  end interface
+
+
+contains
+
+
+!_________________________________________________private__
+!
+  function operator_dot_product(a,b)
+    type(vecfield__t), intent(in) :: a, b
+    real(DR), dimension(GRID_NX,  &
+                        GRID_NY,  &
+                        GRID_NZ) :: operator_dot_product
+!__________________________________________________________
+!
+    operator_dot_product = a%x*b%x + a%y*b%y + a%z*b%z
+
+  end function operator_dot_product
+
+end module vecfield_m

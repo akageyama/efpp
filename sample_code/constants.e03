@@ -14,24 +14,16 @@ module constants_m
   integer <const> :: DR = selected_real_kind(15)
 
   !<< Mathematical constants >>!
-  real(DR) <const>    :: PI = 3.141592653589793_DR
-  real(DR) <const>    :: TWOPI = PI*2
+  real(DR) <const> :: PI = 3.141592653589793_DR
+  real(DR) <const> :: TWOPI = PI*2
 
-  !<< Job karte >>!
-  inte(SI) <const> :: KARTE_SUCCESS   =  0
-  inte(SI) <const> :: KARTE_TIME_OUT  =  1
-  inte(SI) <const> :: KARTE_OVERFLOW  =  2
-  inte(SI) <const> :: KARTE_UNDERFLOW =  3
-
-  !<< NULL >>!
-  inte(SI) <const> :: NIL = huge(1)
-
-  !<< Time information >>!
-  type TIME_
-     inte(SI) :: nloop
-     inte(SI) :: nloop_end
-     real(DR) :: dt
-     real(DR) :: time
-  end type TIME_
+  !<< Simulation constants >>!
+  inte(SI) <const> :: GRID_NX = 10
+  inte(SI) <const> :: GRID_NY = 12
+  inte(SI) <const> :: GRID_NZ = 14
+  real(DR) <const> :: GRID_DX = 1.0_DR / GRID_NX
+  real(DR) <const> :: GRID_DY = 1.0_DR / GRID_NY
+  real(DR) <const> :: GRID_DZ = 1.0_DR / GRID_NZ
+  real(DR) <const> :: GRID_DVOL = GRID_DX*GRID_DY*GRID_DZ
 
 end module constants_m

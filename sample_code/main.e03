@@ -4,29 +4,37 @@
 
 program main
   use constants_m
-  use namelist_m
+  use time_m
+  use vecfield_m
   implicit none
 
-  type(TIME_) :: t
+  type(time__t) :: time = time__t(0, 0.1_DR, 0.0_DR)
   logical :: just_once = .true.
 
-  __debug_print:'start'
-  call namelist__read
-  __debug_print:'namelist_read called'
+  type(vecfield__t) :: magnetic
+  real(DR) :: energy, dvol2 = GRID_DVOL/2
 
-  t.nloop = 0
-  t.time = 0.0_DR
-  do while ( t.nloop < namelist__integer('Loop_end') )
-     ==<just_once>==
-       ! this part is called only once.
-     ==</just_once>==
+  magnetic.x(:,:,:) = 1.0_DR
+  magnetic.y(:,:,:) = 0.0_DR
+  magnetic.z(:,:,:) = 0.0_DR
 
-     ==============
-       computation
-     ==============
-     __debug_print:'computation called'
-     t.nloop += 1
-     t.time += t.dt
+  do while ( time.loop <= 10 )
+    ==<just_once>==
+      ! this part is called only once.
+      __debugp__ 'Start loop. dt = ', time.dt
+    ==</just_once>==
+
+    ==============
+      Normalized magnetic energy
+           = \int_V \frac{B^2}{2} dV
+    ==============
+    energy = sum(magnetic .dot. magnetic) * dvol2
+    __debugp__ 't, energy = ', time.t, energy
+
+    magnetic.x(:,:,:) *= 0.70710678118654752_DR
+
+    time.loop += 1
+    time.t += time.dt
   end do
 
 end program main
