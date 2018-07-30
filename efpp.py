@@ -173,6 +173,67 @@ def read_alias_list_and_make_dict(filename):
 
 
 #=============================================
+def replace_period_in_member_accessor(string_in):
+#=============================================
+
+    string_work1 = replace_characters_sandwiched_by_double_quotes(string_in)
+    string_work2 = replace_characters_sandwiched_by_single_quotes(string_work1)
+    string_work3 = remove_characters_in_comment(string_work2)
+
+    # Regexp for the period letter '.' used as a member access operator.
+    pattern = r'[a-zA-Z][a-zA-Z_0-9]*?\)?\.[a-zA-Z][a-zA-Z_0-9]*?'
+    #  array(3).a02.mem01 ==> array(3)%a03%mem01
+    m = re.search(pattern, string_work3)
+    ans = string_in
+    if m:
+        char_pos = string_in.find('.', m.start(), m.end()) # in the match
+        string_work = replace_chars_in_string(string_in, char_pos, char_pos, '%')
+        ans = replace_period_in_member_accessor(string_work)
+    return ans
+
+
+#=============================================
+def replace_chars_in_string(string_in, pos_stt, pos_end, target_char):
+#=============================================
+    i = pos_stt
+    char_list = list(string_in)
+
+    while i <= pos_end:
+        char_list[i] = target_char
+        i += 1
+    string_out = "".join(char_list)
+    return string_out
+
+
+#=============================================
+def replace_characters_sandwiched_by_double_quotes(string_in):
+#=============================================
+    ans = string_in
+    m = re.search(r'\".*?\"', string_in)
+    if m:
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.end()-1, 'X')
+        ans = replace_characters_sandwiched_by_double_quotes(string_tmp)  # Recursion
+    return ans
+
+
+#=============================================
+def replace_characters_sandwiched_by_single_quotes(string_in):
+#=============================================
+    ans = string_in
+    m = re.search(r'\'.*?\'', string_in)
+    if m:
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.end()-1, 'Y')
+        ans = replace_characters_sandwiched_by_single_quotes(string_tmp)  # Recursion
+    return ans
+
+#=============================================
+def remove_characters_in_comment(string_in):
+#=============================================
+    return re.sub(r'!.*', '!', string_in)
+
+
+
+#=============================================
 def alias_decode(lines_in):
 #=============================================
     """
@@ -463,7 +524,7 @@ def routine_name_macro(lines_in):
     output = list()
     pat_program_in = re.compile(r'^([\s]*)program[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
     pat_module_in = re.compile(r'^([\s]*)module[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
-    pat_subroufunc_in = re.compile(r'^([\s]*)(subroutine|function)[\s]+([a-zA-Z][a-zA-Z_0-9]*)[\s\(].*')
+    pat_subroufunc_in = re.compile(r'^([\s]*)(elemental\s+)?(subroutine|function)[\s]+([a-zA-Z][a-zA-Z_0-9]*)[\s\(].*')
     pat_interface_in = re.compile(r'^([\s]*)interface[\s]+[a-zA-Z][a-zA-Z_0-9]*')
 
     pat_program_out = re.compile(r'^([\s]*)end[\s]+program[\s]+[a-zA-Z][a-zA-Z_0-9]*')
@@ -494,7 +555,7 @@ def routine_name_macro(lines_in):
             if not this_line_is_in_interface:
                 name.append(match_module_in.group(2))
         if match_subroufunc_in:
-            name.append(match_subroufunc_in.group(3))
+            name.append(match_subroufunc_in.group(4))
         if match_program_out:
             name.pop()
         if match_module_out:
@@ -518,7 +579,7 @@ def routine_name_macro(lines_in):
 
 
 #=============================================
-def type_member_macro(lines_in):
+def member_access_operator_macro(lines_in):
 #=============================================
     """
       Replaces "." to "%", for example,
@@ -528,63 +589,17 @@ def type_member_macro(lines_in):
       is converted to
 
         > call mhd%sub%update(mhd%main)
-
-      Exceptions of the conversion:
-        1) The dot in single-quotation makrs.  e.g.) filename = 'main.e03'
-        2) The dot in double-quotation makrs.  e.g.) filename = "main.e03"
-        3) User-defined and logical operators. e.g.) A .and. B
-        4) Logical operator ".not.".           e.g.) .not.must_be_true
-        5) The dot in a floating point number. e.g.) 3.141592, -1.e-14
-        6) Dots in comment lines.              e.g.) ! main.sub 
     """
+    """
+        a3.y14 = 3.10_DR
+        grid.x = 1.0_DR
+    """
+
     output = list()
-    pat_type_member = re.compile(r'.*[a-zA-Z_0-9]\.[a-zA-Z_].*\n')
-    pat_single_quotation = r'\'.*?\''
-    pat_double_quotation = r'\".*?\"'
-    pat_surrounded_dot = r'\s+\.[a-zA-Z_0-9]*?\.\s+'
-    pat_not_dot = r'\.not\.'
-    pat_number_dot = r'[+-]?[0-9]+\.[eE]?[+-]?[0-9]*'
-    pat_exclamation = re.compile(r'\!.*\n')
 
     for line in lines_in:
-        before = pat_type_member.search(line)
-        if before:
-            before_line = before.group()
-            ignore_list = list()
-            iterator_sq = re.finditer(pat_single_quotation,before_line)
-            for match_sq in iterator_sq:
-                ignore_list.append(match_sq.span())
-            iterator_dq = re.finditer(pat_double_quotation,before_line)
-            for match_dq in iterator_dq:
-                ignore_list.append(match_dq.span())
-            iterator_sd = re.finditer(pat_surrounded_dot,before_line)
-            for match_sd in iterator_sd:
-                ignore_list.append(match_sd.span())
-            iterator_notd = re.finditer(pat_not_dot,before_line)
-            for match_notd in iterator_notd:
-                ignore_list.append(match_notd.span())
-            iterator_numd = re.finditer(pat_number_dot,before_line)
-            for match_numd in iterator_numd:
-                ignore_list.append(match_numd.span())
-            if pat_exclamation.search(before_line):
-                match_ex = pat_exclamation.search(before_line)
-                ignore_list.append(match_ex.span())
-            end = (len(before_line),0)
-            ignore_list.append(end)
-            ctr = 0
-            if len(ignore_list)>0:
-                for ignore in sorted(ignore_list):
-                    if ctr>ignore[0]:
-                        pass
-                    else:
-                        before_slice = before_line[ctr:ignore[0]]
-                        after_slice = before_slice.replace('.','%')
-                        before_line = before_line.replace(before_slice,after_slice)
-                        ctr = ignore[1]
-            else:
-                before_line = before_line.replace('.','%')
-            line = before_line
-        output.append(line)
+        line_replaced = replace_period_in_member_accessor(line)
+        output.append(line_replaced)
 
     return output
 
@@ -750,7 +765,7 @@ def efpp(filename_in):
         lines = just_once_region(lines)
         lines = skip_counter(lines)
         lines = routine_name_macro(lines)
-        lines = type_member_macro(lines)
+        lines = member_access_operator_macro(lines)
         lines = alias_decode(lines)
 
         check_implicit_none(filename_in, lines)
