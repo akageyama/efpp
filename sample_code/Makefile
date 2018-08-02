@@ -33,12 +33,14 @@ runme: test
 %.o: %.F90
 	$(FC) $(FFLAGS) -o $@ -c $<
 
+time.o: constants.o
+vecfield.o: constants.o
 main.o: constants.o time.o vecfield.o
 
-test: *.o
+test: main.o
 	$(FC) -o test *.o
 
 
 clean:
-	rm -rf *.o *.lst *.F90 *.mod
+	rm -rf *.o *.lst *.F90 *.mod test
 

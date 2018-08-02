@@ -610,12 +610,12 @@ def check_implicit_none(filename_in, lines_in):
     """
       Check if the line "implicit none" appears.
     """
-    pat_comment = re.compile(r'^\s*\!.*\n')
-    pat_blank = re.compile(r'^\s*\n')
-    pat_use = re.compile(r'^([\s]*)use[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
-    pat_implicit_none = re.compile(r'^([\s]*)implicit none\s+')
-    pat_program = re.compile(r'^([\s]*)program[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
-    pat_module = re.compile(r'^([\s]*)module[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
+    pat_comment = re.compile(r'^\s*\!.*$')
+    pat_blank = re.compile(r'^\s*$')
+    pat_use = re.compile(r'^\s*use\s+[a-zA-Z][a-zA-Z_0-9]*')
+    pat_implicit_none = re.compile(r'^\s*implicit none\s+')
+    pat_program = re.compile(r'^\s*program\s+[a-zA-Z][a-zA-Z_0-9]*')
+    pat_module = re.compile(r'^\s*module\s+[a-zA-Z][a-zA-Z_0-9]*')
     search_mode_on_for_implicit_none = False
 
     for line in lines_in:
