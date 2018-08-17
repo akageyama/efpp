@@ -469,8 +469,8 @@ def skip_counter(lines_in):
         # end program test
     """
     output = list()
-    pat_begin = re.compile(r'^([^=]+)[=]+<skip[\s]+([a-zA-Z][a-zA-Z_0-9]*):([\s]*[\d]+)>[=]+(.*)$')
-    pat_end = re.compile(r'^([^=]+)[=]+</skip[\s]+([a-zA-Z][a-zA-Z_0-9]*)>[=]+(.*)$')
+    pat_begin = re.compile(r'^([^=]+)=+<skip\s+([a-zA-Z][a-zA-Z_0-9]*):(\s*.+)>=+(.*)$')
+    pat_end = re.compile(r'^([^=]+)=+</skip\s+([a-zA-Z][a-zA-Z_0-9]*)>=+(.*)$')
 
     for line in lines_in:
         match_begin = pat_begin.search(line)
@@ -515,7 +515,7 @@ def routine_name_macro(lines_in):
            subroutine sub1(...) ! <= Count this as a 'subroutine'
            contains
              function fun2(...) ! <= Count this as a 'function'
-               print('__MODULE__/__PROGRAM__')   ! print('main0/sub1/fun2')
+               print('__MODFUNC__')   ! print('main0/sub1/fun2')
              end function fun2
            end subroutine sub1
          end program main0
@@ -568,10 +568,14 @@ def routine_name_macro(lines_in):
             line = line.replace('__MODULE__', progmodule_name)
         if len(name)==3:
             subroufunc_name = name[1] + '/' + name[2]
-            line = line.replace('__ROUTINE__', subroufunc_name)
+            line = line.replace('__FUNC__', subroufunc_name)
+            module_plus_subroufunc_name = progmodule_name + '/' + subroufunc_name
+            line = line.replace('__MODFUNC__', module_plus_subroufunc_name)
         elif len(name)==2:
             subroufunc_name = name[1]
-            line = line.replace('__ROUTINE__', subroufunc_name)
+            line = line.replace('__FUNC__', subroufunc_name)
+            module_plus_subroufunc_name = progmodule_name + '/' + subroufunc_name
+            line = line.replace('__MODFUNC__', module_plus_subroufunc_name)
 
         output.append(line)
 
