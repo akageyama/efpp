@@ -21,7 +21,7 @@ program main
   do while ( time.loop <= 10 )
     ==<just_once>==
       ! this part is called only once.
-      __debugp__ 'Start loop. dt = ', time.dt
+      !debugp 'Start loop. dt = ', time.dt
     ==</just_once>==
 
     ==============
@@ -29,7 +29,7 @@ program main
            = \int_V \frac{B^2}{2} dV
     ==============
     energy = sum(magnetic .dot. magnetic) * dvol2
-    __debugp__ 't, energy = ', time.t, energy
+    !debugp 't, energy = ', time.t, energy
 
     magnetic.x(:,:,:) *= 0.70710678118654752_DR
 

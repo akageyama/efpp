@@ -1,8 +1,5 @@
+# macros
+     "!debugp "
+  => "print *, '\db\ __MODULE__(__LINE__): '//"
 
-# typedef
-     "__debugp__"
-# => "!print *,"
-  => "print *,"
-
-     "__EFPPVER__"
-  => "180802"
+     "__EFPPVER__" => "180802"
