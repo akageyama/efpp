@@ -712,15 +712,18 @@ def efpp(filename_in):
         # 'kutimer_decode' generates routine calls such
         # as '...  -call kutimer__...', which is supposed
         # to be processed by 'subsdiary_call_decode'.
+        #   One more condition, 'alias_docode' should be
+        # called before 'routine_name_macro', __LINE__ etc, 
+        # could be included in 'efpp_alias.list'.
         lines = kutimer_docode(lines)
         lines = subsdiary_call_decode(lines)
         lines = block_comment(lines)
         lines = operator_decode(lines)
         lines = just_once_region(lines)
         lines = skip_counter(lines)
+        lines = alias_decode(lines)
         lines = routine_name_macro(lines)
         lines = member_access_operator_macro(lines)
-        lines = alias_decode(lines)
 
         check_implicit_none(filename_in, lines)
 
