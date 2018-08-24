@@ -262,33 +262,6 @@ def alias_decode(lines_in):
           ,
             "do k full"
           : "do k = 0 , NZPP1"
-          ,
-            "\[div_v_ijk_term01\]"
-          : "(vx(ip1,j,k)-vx(im1,j,k))*dx1"
-          ,
-            "\[div_v_ijk_term02\]"
-          : "(vy(i,jp1,k)-vy(i,jm1,k))*dy1"
-          ,
-            "\[div_v_ijk_term03\]"
-          : "(vz(i,j,kp1)-vz(i,j,km1))*dz1"
-          ,
-            "\[curl_v_ijk_x\]"
-          : "(vz(i,jp1,k)-vz(i,jm1,k))*dy1-(vy(i,j,kp1)-vy(i,j,km1))*dz1"
-          ,
-            "\[curl_v_ijk_y\]"
-          : "(vx(i,j,kp1)-vx(i,j,km1))*dz1-(vz(ip1,j,k)-vz(im1,j,k))*dx1"
-          ,
-            "\[curl_v_ijk_z\]"
-          : "(vy(ip1,j,k)-vy(im1,j,k))*dx1-(vx(i,jp1,k)-vx(i,jm1,k))*dy1"
-          ,
-            "\[grad_f_ijk_x\]"
-          : "(f(ip1,j,k)-f(im1,j,k))*dx1"
-          ,
-            "\[grad_f_ijk_y\]"
-          : "(f(i,jp1,k)-f(i,jm1,k))*dy1"
-          ,
-            "\[grad_f_ijk_z\]"
-          : "(f(i,j,kp1)-f(i,j,km1))*dz1"
         }
     ====</sample of alias_dict>====
 
@@ -315,33 +288,6 @@ def alias_decode(lines_in):
 
              "do k full"
           => "do k = 0 , NZPP1"
-
-             "\[div_v_ijk_term01\]"
-          => "(vx(ip1,j,k)-vx(im1,j,k))*dx1"
-
-             "\[div_v_ijk_term02\]"
-          => "(vy(i,jp1,k)-vy(i,jm1,k))*dy1"
-
-             "\[div_v_ijk_term03\]"
-          => "(vz(i,j,kp1)-vz(i,j,km1))*dz1"
-
-             "\[curl_v_ijk_x\]"
-          => "(vz(i,jp1,k)-vz(i,jm1,k))*dy1-(vy(i,j,kp1)-vy(i,j,km1))*dz1"
-
-             "\[curl_v_ijk_y\]"
-          => "(vx(i,j,kp1)-vx(i,j,km1))*dz1-(vz(ip1,j,k)-vz(im1,j,k))*dx1"
-
-             "\[curl_v_ijk_z\]"
-          => "(vy(ip1,j,k)-vy(im1,j,k))*dx1-(vx(i,jp1,k)-vx(i,jm1,k))*dy1"
-
-             "\[grad_f_ijk_x\]"
-          => "(f(ip1,j,k)-f(im1,j,k))*dx1"
-
-             "\[grad_f_ijk_y\]"
-          => "(f(i,jp1,k)-f(i,jm1,k))*dy1"
-
-             "\[grad_f_ijk_z\]"
-          => "(f(i,j,kp1)-f(i,j,km1))*dz1"
 
     ====</source of the above: efpp_alias.list>====
 
@@ -431,8 +377,8 @@ def just_once_region(lines_in):
        end program test
     """
     output = list()
-    pat_begin = re.compile(r'^([^=]+)[=]+<just_once>[=]+(.*)$')
-    pat_end = re.compile(r'^([^=]+)[=]+</just_once>[=]+(.*)$')
+    pat_begin = re.compile(r'^([^=]+)=+<just_once>=+(.*)$')
+    pat_end = re.compile(r'^([^=]+)=+</just_once>=+(.*)$')
 
     for line in lines_in:
         match_begin = pat_begin.search(line)
@@ -469,8 +415,8 @@ def skip_counter(lines_in):
         # end program test
     """
     output = list()
-    pat_begin = re.compile(r'^([^=]+)[=]+<skip[\s]+([a-zA-Z][a-zA-Z_0-9]*):([\s]*[\d]+)>[=]+(.*)$')
-    pat_end = re.compile(r'^([^=]+)[=]+</skip[\s]+([a-zA-Z][a-zA-Z_0-9]*)>[=]+(.*)$')
+    pat_begin = re.compile(r'^([^=]+)=+<skip\s+([a-zA-Z][a-zA-Z_0-9]*):(\s*.+)>=+(.*)$')
+    pat_end = re.compile(r'^([^=]+)=+</skip\s+([a-zA-Z][a-zA-Z_0-9]*)>=+(.*)$')
 
     for line in lines_in:
         match_begin = pat_begin.search(line)
@@ -515,22 +461,22 @@ def routine_name_macro(lines_in):
            subroutine sub1(...) ! <= Count this as a 'subroutine'
            contains
              function fun2(...) ! <= Count this as a 'function'
-               print('__MODULE__/__PROGRAM__')   ! print('main0/sub1/fun2')
+               print('__MODFUNC__')   ! print('main0/sub1/fun2')
              end function fun2
            end subroutine sub1
          end program main0
     """
     this_line_is_in_interface = False
     output = list()
-    pat_program_in = re.compile(r'^([\s]*)program[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
-    pat_module_in = re.compile(r'^([\s]*)module[\s]+([a-zA-Z][a-zA-Z_0-9]*)\s+')
-    pat_subroufunc_in = re.compile(r'^([\s]*)(elemental\s+)?(subroutine|function)[\s]+([a-zA-Z][a-zA-Z_0-9]*)[\s\(].*')
-    pat_interface_in = re.compile(r'^([\s]*)interface[\s]+[a-zA-Z][a-zA-Z_0-9]*')
+    pat_program_in = re.compile(r'^(\s*)program\s+([a-zA-Z][a-zA-Z_0-9]*)\s+')
+    pat_module_in = re.compile(r'^(\s*)module\s+([a-zA-Z][a-zA-Z_0-9]*)\s+')
+    pat_subroufunc_in = re.compile(r'^(\s*)(elemental\s+)?(subroutine|function)\s+([a-zA-Z][a-zA-Z_0-9]*)[\s\(].*')
+    pat_interface_in = re.compile(r'^(\s*)interface\s+[a-zA-Z][a-zA-Z_0-9]*')
 
-    pat_program_out = re.compile(r'^([\s]*)end[\s]+program[\s]+[a-zA-Z][a-zA-Z_0-9]*')
-    pat_module_out = re.compile(r'^([\s]*)end[\s]+module[\s]+[a-zA-Z][a-zA-Z_0-9]*')
-    pat_subroufunc_out = re.compile(r'^([\s]*)end[\s]+(subroutine|function)[\s]+[a-zA-Z][a-zA-Z_0-9]*')
-    pat_interface_out = re.compile(r'^([\s]*)end[\s]+interface')
+    pat_program_out = re.compile(r'^(\s*)end\s+program\s+[a-zA-Z][a-zA-Z_0-9]*')
+    pat_module_out = re.compile(r'^(\s*)end\s+module\s+[a-zA-Z][a-zA-Z_0-9]*')
+    pat_subroufunc_out = re.compile(r'^(\s*)end\s+(subroutine|function)\s+[a-zA-Z][a-zA-Z_0-9]*')
+    pat_interface_out = re.compile(r'^(\s*)end\s+interface')
 
     name = list()
     for line in lines_in:
@@ -568,10 +514,14 @@ def routine_name_macro(lines_in):
             line = line.replace('__MODULE__', progmodule_name)
         if len(name)==3:
             subroufunc_name = name[1] + '/' + name[2]
-            line = line.replace('__ROUTINE__', subroufunc_name)
+            line = line.replace('__FUNC__', subroufunc_name)
+            module_plus_subroufunc_name = progmodule_name + '/' + subroufunc_name
+            line = line.replace('__MODFUNC__', module_plus_subroufunc_name)
         elif len(name)==2:
             subroufunc_name = name[1]
-            line = line.replace('__ROUTINE__', subroufunc_name)
+            line = line.replace('__FUNC__', subroufunc_name)
+            module_plus_subroufunc_name = progmodule_name + '/' + subroufunc_name
+            line = line.replace('__MODFUNC__', module_plus_subroufunc_name)
 
         output.append(line)
 
