@@ -478,8 +478,10 @@ def routine_name_macro(lines_in):
     pat_subroufunc_out = re.compile(r'^(\s*)end\s+(subroutine|function)\s+[a-zA-Z][a-zA-Z_0-9]*')
     pat_interface_out = re.compile(r'^(\s*)end\s+interface')
 
+    lctr = 0  # line counter
     name = list()
     for line in lines_in:
+        lctr += 1
         match_program_in = pat_program_in.search(line)
         match_module_in = pat_module_in.search(line)
         match_subroufunc_in = pat_subroufunc_in.search(line)
@@ -522,6 +524,8 @@ def routine_name_macro(lines_in):
             line = line.replace('__FUNC__', subroufunc_name)
             module_plus_subroufunc_name = progmodule_name + '/' + subroufunc_name
             line = line.replace('__MODFUNC__', module_plus_subroufunc_name)
+
+        line = line.replace('__LINE__', str(lctr))
 
         output.append(line)
 
