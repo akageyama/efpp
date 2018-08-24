@@ -36,9 +36,10 @@ contains
 !__________________________________________________________
 !
     operator_dot_product = a%x*b%x + a%y*b%y + a%z*b%z
-    __debugp__ '      hello. i am in a function named __FUNC__'
-    __debugp__ '             which is in a module named __MODULE__'
-    __debugp__ '             in short, i am in __MODFUNC__'
+    __debugp__ ' \\\  hello. i am in a function named __FUNC__'
+    __debugp__ ' \\\         which is in __MODULE__'
+    __debugp__ ' \\\         at line number __LINE__'
+    __debugp__ ' \\\         in short, i am in __MODFUNC__'
 
   end function operator_dot_product
 
