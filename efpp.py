@@ -620,7 +620,7 @@ def kutimer_docode(lines_in):
     pat_cal = re.compile(r'^(.*)\s+!\{(......)\}\{(......)\}')
     pat_cnt = re.compile(r'^(.*)\s+!\{\{count\}\}')
     pat_end = re.compile(r'^(.*)\s+!\{(......)\}\{\{END\}\}')
-    pat_pri = re.compile(r'^(.*)\s+!\{\{print\}\}')
+    pat_pri = re.compile(r'^(.*)\s+!\{\{print\}\}(.*)')
 
     name = list()
     for line in lines_in:
@@ -647,7 +647,7 @@ def kutimer_docode(lines_in):
             line += '\')' + '\n'
         if match_pri:
             line = match_pri.group(1) + ' '
-            line += '-call kutimer__print\n'
+            line += '-call kutimer__print' + match_pri.group(2) + '\n'
         output.append(line)
 
     return output
