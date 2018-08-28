@@ -140,7 +140,7 @@ becomes
 The script efpp.py does not change the line numbers of the source code. One can make use of the quickfix feature of vim with minimum changes. when efpp.py sample.e03 > sample.F90 is applied, all we have to do is to change the source code name from sample.F90 into sample.e03. To automatically apply this, set the following map in your .vimrc:
 
 ```
-nnoremap <silent> Y :copen<CR>:set modifiable<CR>:%s/.F90/.e03/<CR>:cbuffer<CR>:cclose<CR>
+nnoremap <silent> Y :copen<CR>:set modifiable<CR>:%s/.F90/.e03/<CR>:call histdel('/',-1)<CR>:cbuffer<CR>:cclose<CR>
 ```
 
 (1) Type :make!
