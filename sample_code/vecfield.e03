@@ -35,11 +35,14 @@ contains
                         GRID_NZ) :: operator_dot_product
 !__________________________________________________________
 !
-    operator_dot_product = a%x*b%x + a%y*b%y + a%z*b%z
-    !debugp '|| hello. i am in a function named __FUNC__'
-    !debugp '||        which is in __MODULE__'
-    !debugp '||        this is at line number __LINE__'
-    !debugp '||        in short, i am in __MODFUNC__'
+    operator_dot_product  = a.x*b.x
+    operator_dot_product += a.y*b.y
+    operator_dot_product += a.z*b.z
+
+    !debugp ' hello. i am in a function named __FUNC__'
+    !debugp '        which is in __MODULE__'
+    !debugp '        this is at line number __LINE__'
+    !debugp '        in short, i am in __MODFUNC__'
 
   end function operator_dot_product
 
