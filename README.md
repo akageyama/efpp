@@ -5,7 +5,7 @@ efpp: A preprocessor for eFortran, a dialect of the modern Fortran
 ## Usage
 efpp.py sample.e03 > sample.F90
 
-Here sample.e03 is a eFortran program, and
+where sample.e03 is an eFortran program, and
 sample.F90 is a standard Fortran 2003 program.
 
 ## Functions
@@ -25,17 +25,9 @@ For example,
 
 ```
   inte(SI) <in> :: i, j, k
-  real(DR) <optout> :: pi
+  real(DR) <optin> :: pi
 ```
 
-### Subsdiary call
-
-It is convenient for test or timer routine calls.
-
-```
-       xyz -call abc()  =>  xyz ;call abc()
-           -call abc()  =>       call abc()
-```
 
 ### "Just once" block
 
@@ -90,7 +82,7 @@ An example of efpp_alias.list is
 
 ### Implicit none check
 
-Check if implicit noe is called in each module.
+efpp.py checks if implicit none is called in each module.
 
 ### Operators
 
@@ -107,6 +99,9 @@ Check if implicit noe is called in each module.
 ```
 
 ### Block comment
+
+Lines between two '=' trains are comments.
+For example, 
 
 ```
       abc def ghijklmn opq
@@ -135,18 +130,39 @@ becomes
      abc def ghijklmn opq
 ```
 
+### Subsdiary call
+
+```
+       xyz -call abc()  =>  xyz ;call abc()
+           -call abc()  =>       call abc()
+```
+
+This could be convenient for test or timer routine calls.
+
+
 ## A tip to compile in Vim
 
-The script efpp.py does not change the line numbers of the source code. One can make use of the quickfix feature of vim with minimum changes. when efpp.py sample.e03 > sample.F90 is applied, all we have to do is to change the source code name from sample.F90 into sample.e03. To automatically apply this, set the following map in your .vimrc:
+Since efpp.py does not change the line numbers of the source code, one can make use of quickfix vim with minimum changes.
+When sample.F90 is generated from sample.e03 by efpp.py sample.e03,
+all we have to do is to change the source code name in the quickfix list (by :copen in Vim),
+from sample.F90 into sample.e03. 
+
+To automatically apply this change without explicitly open and change the quickfix list, 
+set the following map in your .vimrc:
 
 ```
 nnoremap <silent> Y :copen<CR>:set modifiable<CR>:%s/.F90/.e03/<CR>:call histdel('/',-1)<CR>:cbuffer<CR>:cclose<CR>
 ```
 
-(1) Type :make!
+and 
+
+(1) In Vim, type :make!
+
+then
 
 (2) Type Y
 
+You can jump to the error lines in sample.e03 by the standard quickfix procedure (:cnext, etc.)
 
 ## Reference
 
