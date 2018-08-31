@@ -36,7 +36,7 @@ program main
     magnetic.x(:,:,:) *= 0.70710678118654752_DR
 
     time.loop += 1
-    time.t += time.dt  !debugp time.loop, time.t, energy
+    time.t    += time.dt  !debugp time.loop, time.t, energy
   end do
 
 end program main

@@ -676,7 +676,9 @@ def operator_decode(lines_in):
     """
     output = list()
 
-    pat = re.compile(r'^(.*)\s+(.*)\s+([\+\-\*])=\s+(.*)$')
+    pat = re.compile(r'(.*)\s+?(\S+)' \
+                      '\s+?([\+\-\*])=\s+?' \
+                      '(.+)$')
     for line in lines_in:
         match = pat.search(line)
         if match:
