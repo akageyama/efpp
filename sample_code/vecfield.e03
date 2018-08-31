@@ -9,10 +9,10 @@ module vecfield_m
   implicit none
 
   private
-  public :: vecfield__t
-  public :: operator( .dot. )
+  public :: vecfield__init,  &
+            operator( .dot. )
 
-  type vecfield__t
+  type, public :: vecfield__t
     real(DR) :: x(GRID_NX,GRID_NY,GRID_NZ)
     real(DR) :: y(GRID_NX,GRID_NY,GRID_NZ)
     real(DR) :: z(GRID_NX,GRID_NY,GRID_NZ)
@@ -24,7 +24,6 @@ module vecfield_m
 
 
 contains
-
 
 !_________________________________________________private__
 !
@@ -39,11 +38,19 @@ contains
     operator_dot_product += a.y*b.y
     operator_dot_product += a.z*b.z
 
-    !debugp ' hello. i am in a function named __FUNC__'
+  end function operator_dot_product
+
+
+!_________________________________________________public___
+!
+  subroutine vecfield__init
+!__________________________________________________________
+!
+    !debugp ' hello. I am in a function named __FUNC__'
     !debugp '        which is in __MODULE__'
     !debugp '        this is at line number __LINE__'
     !debugp '        in short, i am in __MODFUNC__'
 
-  end function operator_dot_product
+  end subroutine vecfield__init
 
 end module vecfield_m

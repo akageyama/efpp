@@ -626,7 +626,6 @@ def kutimer_docode(lines_in):
     pat_end = re.compile(r'^(.*)\s+!\{(......)\}\{\{END\}\}')
     pat_pri = re.compile(r'^(.*)\s+!\{\{print\}\}(.*)')
 
-    name = list()
     for line in lines_in:
         match_stt = pat_stt.search(line)
         match_cal = pat_cal.search(line)
@@ -695,6 +694,61 @@ def operator_decode(lines_in):
 
 
 #=============================================
+def debugp_decode(lines_in):
+#=============================================
+    """
+      !debugp val
+    =>
+      print *, "\\modname(linenum): ", "val =", val
+
+      !debugp "str"
+    =>
+      print *, "\\modname(linenum): ", "str"
+
+      !debugp "str", val1
+    =>
+      print *, "\\modname(linenum): ", "str", "val1 = ", val1
+
+      !debugp "str", val1, val2, ...
+    =>
+      print *, "\\modname(linenum): ", "str", "val1 = ", val1, "val2 = ", ...
+
+      !debugp "str1", val1, "str2", val2, ...
+    =>
+      print *, "\\modname(linenum): ", "str1", "val1 = ", val1, "str2", "val2 = ", ...
+    """
+    output = list()
+
+    pat = re.compile(r'(.*)!debugp\s+(.*)$')
+
+    for line in lines_in:
+        match = pat.search(line)
+        if match:
+            args = match.group(2).split(',')
+            line = match.group(1)
+            if line.strip():  # it's not empty.
+                line += ';'
+            line += 'print *, '
+            line += '\"\\\\__MODULE__(__LINE__): \", '
+            for arg in args:
+                a = arg.strip() # put off blanks
+                if a[0]=='\'' or a[0]=='\"':  # string (e.g., 'message')
+                    if a[-1]=='\'' or a[-1]=='\"':  # string (e.g., 'say,...)
+                        line += a + ', '
+                    else:
+                        line += a + ', ' + a[0] + ', '
+                elif a[-1]=='\'' or a[-1]=='\"':# string (e.g., '..., smthng')
+                    line +=  a[-1] + a + ', '
+                else:
+                    line += "\" " + a + " = \", " + a + ', '
+            line = line[:-2]  # put of the last "comma + space"
+            line += '\n'
+        output.append(line)
+
+    return output
+
+
+#=============================================
 def efpp(filename_in):
 #=============================================
 
@@ -722,6 +776,7 @@ def efpp(filename_in):
         lines = just_once_region(lines)
         lines = skip_counter(lines)
         lines = alias_decode(lines)
+        lines = debugp_decode(lines)
         lines = routine_name_macro(lines)
         lines = member_access_operator_macro(lines)
 

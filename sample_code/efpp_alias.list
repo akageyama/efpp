@@ -1,5 +1,2 @@
 # macros
-     "!debugp "
-  => "print *, '\db\ __MODULE__(__LINE__): '//"
-
-     "__EFPPVER__" => "180802"
+     "__EFPPVER__" => "180831"

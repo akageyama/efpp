@@ -14,6 +14,9 @@ program main
   type(vecfield__t) :: magnetic
   real(DR) :: energy, dvol2 = GRID_DVOL/2
 
+  !debugp dvol2
+  !debugp "kind vals:", SI, DI, SR, DR
+
   magnetic.x(:,:,:) = 1.0_DR
   magnetic.y(:,:,:) = 0.0_DR
   magnetic.z(:,:,:) = 0.0_DR
@@ -21,7 +24,7 @@ program main
   do while ( time.loop <= 10 )
     ==<just_once>==
       ! this part is called only once.
-      !debugp 'Start loop. dt = ', time.dt
+      call vecfield__init
     ==</just_once>==
 
     ==============
@@ -29,12 +32,11 @@ program main
            = \int_V \frac{B^2}{2} dV
     ==============
     energy = sum(magnetic .dot. magnetic) * dvol2
-    !debugp 't, energy = ', time.t, energy
 
     magnetic.x(:,:,:) *= 0.70710678118654752_DR
 
     time.loop += 1
-    time.t += time.dt
+    time.t += time.dt  !debugp time.loop, time.t, energy
   end do
 
 end program main
