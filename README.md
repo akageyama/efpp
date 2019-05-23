@@ -24,7 +24,7 @@ You can access a member of a derived type by dot (.), instead of % in the standa
 For example, 
 
 ```
-  inte(SI) <in> :: i, j, k
+  integer(SI) <in> :: i, j, k
   real(DR) <optin> :: pi
 ```
 
@@ -44,8 +44,8 @@ For example,
 
 ```
         # program test
-        #   inte(SI) :: ctr=0
-        #   inte(SI) :: i
+        #   integer(SI) :: ctr=0
+        #   integer(SI) :: i
         #   do i = 1 , 200
         #     ===<skip ctr:8>===  ! you can put comment.
         #       call subsub('asdfasdf',i)

@@ -11,7 +11,7 @@ module time_m
   public :: time__t
 
   type time__t
-     inte(SI) :: loop
+     integer(SI) :: loop
      real(DR) :: dt
      real(DR) :: t
   end type time__t
