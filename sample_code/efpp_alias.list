@@ -1,8 +1,2 @@
-
-# typedef
-     "__debugp__"
-# => "!print *,"
-  => "print *,"
-
-     "__EFPPVER__"
-  => "180802"
+# macros
+     "__EFPPVER__" => "180831"
