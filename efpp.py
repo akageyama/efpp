@@ -729,6 +729,8 @@ def debugp_decode(lines_in):
                 line += ';'
             line += 'print *, '
             line += '\"\\\\__MODULE__(__LINE__): \", '
+            count = 0
+            temp = ''
             for arg in args:
                 a = arg.strip() # put off blanks
                 if a[0]=='\'' or a[0]=='\"':  # string (e.g., 'message')
@@ -738,6 +740,19 @@ def debugp_decode(lines_in):
                         line += a + ', ' + a[0] + ', '
                 elif a[-1]=='\'' or a[-1]=='\"':# string (e.g., '..., smthng')
                     line +=  a[-1] + a + ', '
+                elif '(' in a or count!=0:
+                    if '(' in a:
+                        count += a.count('(')
+                        temp += a + ', '
+                    elif ')' in a:
+                        count -= a.count(')')
+                        temp += a + ', '
+                        if count==0:
+                            temp = temp[:-2]  # put of the last "comma + space"
+                            line += "\" " + temp + " = \", " + temp + ', '
+                    else:
+                        temp += a + ', '
+                        print(temp)
                 else:
                     line += "\" " + a + " = \", " + a + ', '
             line = line[:-2]  # put of the last "comma + space"
