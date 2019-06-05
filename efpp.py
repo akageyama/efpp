@@ -729,7 +729,7 @@ def debugp_decode(lines_in):
                 line += ';'
             line += 'print *, '
             line += '\"\\\\__MODULE__(__LINE__): \", '
-            count = 0
+            countParenthesis = 0
             temp = ''
             for arg in args:
                 a = arg.strip() # put off blanks
@@ -740,19 +740,21 @@ def debugp_decode(lines_in):
                         line += a + ', ' + a[0] + ', '
                 elif a[-1]=='\'' or a[-1]=='\"':# string (e.g., '..., smthng')
                     line +=  a[-1] + a + ', '
-                elif '(' in a or count!=0:
+                elif '(' in a or countParenthesis!=0:
                     if '(' in a:
-                        count += a.count('(')
+                        countParenthesis += a.count('(') - a.count(')')
                         temp += a + ', '
+                        if countParenthesis == 0:
+                            temp = temp[:-2]  # put of the last "comma + space"
+                            line += "\" " + temp + " = \", " + temp + ', '
                     elif ')' in a:
-                        count -= a.count(')')
+                        countParenthesis += a.count('(') - a.count(')')
                         temp += a + ', '
-                        if count==0:
+                        if countParenthesis == 0:
                             temp = temp[:-2]  # put of the last "comma + space"
                             line += "\" " + temp + " = \", " + temp + ', '
                     else:
                         temp += a + ', '
-                        print(temp)
                 else:
                     line += "\" " + a + " = \", " + a + ', '
             line = line[:-2]  # put of the last "comma + space"
