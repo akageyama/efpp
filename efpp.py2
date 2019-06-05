@@ -8,9 +8,10 @@
 #    revised on 2018.07.13, for general eFortran codes.
 #
 #  Reference:
-#     S. Hosoyamada and A. Kageyama, A Dialect of
-#     Modern Fortran for Simulations, manuscript
-#     in preparation for AsiaSim2018, 2018.
+#     S. Hosoyamada and A. Kageyama,
+#     "A Dialect of Modern Fortran for Simulations" '
+#     in Communications in Computer and Information Science,
+#     vol 946, pages 439-448, 2018 (Proceedings of AsiaSim2018)
 #
 #  Home page:
 #     https://github.com/akageyama/efpp
@@ -729,6 +730,8 @@ def debugp_decode(lines_in):
                 line += ';'
             line += 'print *, '
             line += '\"\\\\__MODULE__(__LINE__): \", '
+            countParenthesis = 0
+            temp = ''
             for arg in args:
                 a = arg.strip() # put off blanks
                 if a[0]=='\'' or a[0]=='\"':  # string (e.g., 'message')
@@ -738,6 +741,21 @@ def debugp_decode(lines_in):
                         line += a + ', ' + a[0] + ', '
                 elif a[-1]=='\'' or a[-1]=='\"':# string (e.g., '..., smthng')
                     line +=  a[-1] + a + ', '
+                elif '(' in a or countParenthesis!=0:
+                    if '(' in a:
+                        countParenthesis += a.count('(') - a.count(')')
+                        temp += a + ', '
+                        if countParenthesis == 0:
+                            temp = temp[:-2]  # put of the last "comma + space"
+                            line += "\" " + temp + " = \", " + temp + ', '
+                    elif ')' in a:
+                        countParenthesis += a.count('(') - a.count(')')
+                        temp += a + ', '
+                        if countParenthesis == 0:
+                            temp = temp[:-2]  # put of the last "comma + space"
+                            line += "\" " + temp + " = \", " + temp + ', '
+                    else:
+                        temp += a + ', '
                 else:
                     line += "\" " + a + " = \", " + a + ', '
             line = line[:-2]  # put of the last "comma + space"

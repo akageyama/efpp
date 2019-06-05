@@ -8,9 +8,10 @@
 #    revised on 2018.07.13, for general eFortran codes.
 #
 #  Reference:
-#     S. Hosoyamada and A. Kageyama, A Dialect of
-#     Modern Fortran for Simulations, manuscript
-#     in preparation for AsiaSim2018, 2018.
+#     S. Hosoyamada and A. Kageyama,
+#     "A Dialect of Modern Fortran for Simulations" '
+#     in Communications in Computer and Information Science,
+#     vol 946, pages 439-448, 2018 (Proceedings of AsiaSim2018)
 #
 #  Home page:
 #     https://github.com/akageyama/efpp
