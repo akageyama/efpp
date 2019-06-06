@@ -37,7 +37,7 @@ program main
 
   !debugp time.loop, time.t
 
-  !debugp magnetic(1,1,1)
+  !debugp magnetic.x(1,1,1)
 
   if ( vecfield__is_zero_?_(magnetic) )  print *, "zero?!"
 
