@@ -9,8 +9,9 @@ module vecfield_m
   implicit none
 
   private
-  public :: vecfield__init,  &
-            operator( .dot. )
+  public :: operator( .dot. ),  &
+            vecfield__init,  &
+            vecfield__is_zero_?_
 
   type, public :: vecfield__t
     real(DR) :: x(GRID_NX,GRID_NY,GRID_NZ)
@@ -28,7 +29,7 @@ contains
 !_________________________________________________private__
 !
   function operator_dot_product(a,b)
-    type(vecfield__t), intent(in) :: a, b
+    type(vecfield__t) <in> :: a, b
     real(DR), dimension(GRID_NX,  &
                         GRID_NY,  &
                         GRID_NZ) :: operator_dot_product
@@ -43,7 +44,8 @@ contains
 
 !_________________________________________________public___
 !
-  subroutine vecfield__init
+  subroutine vecfield__init(a)
+    type(vecfield__t) <out> :: a
 !__________________________________________________________
 !
     !debugp ' hello. I am in a function named __FUNC__'
@@ -51,6 +53,27 @@ contains
     !debugp '        this is at line number __LINE__'
     !debugp '        in short, i am in __MODFUNC__'
 
+    a.x(:,:,:) = 1.0_DR
+    a.y(:,:,:) = 0.0_DR
+    a.z(:,:,:) = 0.0_DR
+
   end subroutine vecfield__init
+
+
+!_________________________________________________public___
+!
+  function vecfield__is_zero_?_(a) result(ans)
+    type(vecfield__t) <in> :: a
+    logical :: ans
+!__________________________________________________________
+!
+    !debugp ' hello. I am in a function named __FUNC__'
+    !debugp '        which is in __MODULE__'
+    !debugp '        this is at line number __LINE__'
+    !debugp '        in short, i am in __MODFUNC__'
+
+    ans = ( sum( a .dot. a ) == 0.0_DR )
+
+  end function vecfield__is_zero_?_
 
 end module vecfield_m

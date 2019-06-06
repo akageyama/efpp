@@ -24,7 +24,7 @@ You can access a member of a derived type by dot (.), instead of % in the standa
 For example, 
 
 ```
-  inte(SI) <in> :: i, j, k
+  integer(SI) <in> :: i, j, k
   real(DR) <optin> :: pi
 ```
 
@@ -44,8 +44,8 @@ For example,
 
 ```
         # program test
-        #   inte(SI) :: ctr=0
-        #   inte(SI) :: i
+        #   integer(SI) :: ctr=0
+        #   integer(SI) :: i
         #   do i = 1 , 200
         #     ===<skip ctr:8>===  ! you can put comment.
         #       call subsub('asdfasdf',i)
@@ -166,4 +166,4 @@ You can jump to the error lines in sample.e03 by the standard quickfix procedure
 
 ## Reference
 
-S. Hosoyamada and A. Kageyama, A Dialect of Modern Fortran for Simulations, Proceedings of AsiaSim2018, Kyoto, Japan, 2018.
+S. Hosoyamada and A. Kageyama, "A Dialect of Modern Fortran for Simulations" in Methods and Applications for Modeling and Simulation of Complex Systems, Communications in Computer and Information Science, vol 946, pages 439-448, 2018 (Proceedings of AsiaSim2018)

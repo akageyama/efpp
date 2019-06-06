@@ -17,14 +17,10 @@ program main
   !debugp dvol2
   !debugp "kind vals:", SI, DI, SR, DR
 
-  magnetic.x(:,:,:) = 1.0_DR
-  magnetic.y(:,:,:) = 0.0_DR
-  magnetic.z(:,:,:) = 0.0_DR
-
   do while ( time.loop <= 10 )
     ==<just_once>==
       ! this part is called only once.
-      call vecfield__init
+      call vecfield__init(magnetic)
     ==</just_once>==
 
     ==============
@@ -38,5 +34,11 @@ program main
     time.loop += 1
     time.t    += time.dt  !debugp time.loop, time.t, energy
   end do
+
+  !debugp time.loop, time.t
+
+  !debugp magnetic(1,1,1)
+
+  if ( vecfield__is_zero_?_(magnetic) )  print *, "zero?!"
 
 end program main
