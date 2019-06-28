@@ -53,14 +53,11 @@ def block_comment(lines_in):
 
     output = list()
 
-    comment_span_list = list()
     comment_depth = 0
-    comment_flag = False
 
     for line in lines_in:
         match_obj_in = re.search(r'^\s*!!>$', line)
         match_obj_out = re.search(r'^\s*!!<$', line)
-        comment_flag = False
         if match_obj_out:
             comment_depth -= 1
 
