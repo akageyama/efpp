@@ -1,7 +1,6 @@
-================================================
+!!>
   sample for efpp, ver.__EFPPVER__
-================================================
-
+!!<
 program main
   use constants_m
   use time_m
@@ -18,15 +17,15 @@ program main
   !debugp "kind vals:", SI, DI, SR, DR
 
   do while ( time.loop <= 10 )
-    ==<just_once>==
+    !!><just_once>==
       ! this part is called only once.
       call vecfield__init(magnetic)
-    ==</just_once>==
+    !!<</just_once>==
 
-    ==============
-      Normalized magnetic energy
+     !!>
+         Normalized magnetic energy
            = \int_V \frac{B^2}{2} dV
-    ==============
+     !!<
     energy = sum(magnetic .dot. magnetic) * dvol2
 
     magnetic.x(:,:,:) *= 0.70710678118654752_DR
