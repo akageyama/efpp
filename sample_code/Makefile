@@ -28,7 +28,7 @@ runme: test
 
 
 %.F90: %.e03
-	../efpp_test.py $< > $@
+	../efpp.py $< > $@
 
 %.o: %.F90
 	$(FC) $(FFLAGS) -o $@ -c $<

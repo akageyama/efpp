@@ -1,6 +1,6 @@
-!!>
+!!> aaaaaa
 !  sample for efpp, ver.180831
-!!<
+!!< zzzzzz
 program main
   use constants_m
   use time_m
@@ -18,8 +18,8 @@ program main
 
   do while ( time%loop <= 10 )
     !!><just_once>==
-      ! this part is called only once.
-      call vecfield__init(magnetic)
+!      ! this part is called only once.
+!      call vecfield__init(magnetic)
     !!<</just_once>==
 
      !!>

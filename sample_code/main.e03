@@ -1,6 +1,6 @@
-!!>
+!!> aaaaaa
   sample for efpp, ver.__EFPPVER__
-!!<
+!!< zzzzzz
 program main
   use constants_m
   use time_m
