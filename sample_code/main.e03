@@ -1,6 +1,6 @@
-================================================
+!!>
   sample for efpp, ver.__EFPPVER__
-================================================
+!!<
 
 program main
   use constants_m
@@ -23,10 +23,10 @@ program main
       call vecfield__init(magnetic)
     ==</just_once>==
 
-    ==============
+    !!>
       Normalized magnetic energy
            = \int_V \frac{B^2}{2} dV
-    ==============
+    !!<
     energy = sum(magnetic .dot. magnetic) * dvol2
 
     magnetic.x(:,:,:) *= 0.70710678118654752_DR

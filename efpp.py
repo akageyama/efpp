@@ -26,59 +26,46 @@ def block_comment(lines_in):
       sample input:
       --------------------------
                 abc def ghijklmn opq
-                =======
+                !!>
                 abc def ghijklmn opq
-                  ======
+                  !!>
                   abc def ghijklmn opq
                   abc def ghijklmn opq
-                  ======
+                  !!<
                 abc def ghijklmn opq
-                =======
+                !!<
                 abc def ghijklmn opq
 
       sample output
       --------------------------
                 abc def ghijklmn opq
-                !=======
+                !!>
                 !abc def ghijklmn opq
-                !!  ======
+                !   !!>
                 !!  abc def ghijklmn opq
                 !!  abc def ghijklmn opq
-                !!  ======
+                !   !!<
                 !abc def ghijklmn opq
-                !=======
+                !!<
                 abc def ghijklmn opq
       --------------------------
     """
 
     output = list()
 
-    comment_span_list = list()
     comment_depth = 0
-    comment_block_exit_flag = False
 
     for line in lines_in:
-        match_obj = re.search(r'^ *===+\s+$', line)
-        comment_block_exit_flag = False
-        if match_obj:
-            span = match_obj.span()
-            if comment_depth == 0:  # Entered the 1st comment block.
-                comment_span_list.append(span)
-                comment_depth = 1
-            else:
-                if span==comment_span_list[-1]:
-                    # End of the present comment block.
-                    del comment_span_list[-1]
-                    comment_block_exit_flag = True
-                else: # Entered new (deeper) comment block.
-                    comment_span_list.append(span)
-                    comment_depth += 1
+        match_obj_in = re.search(r'^\s*!!>', line)
+        match_obj_out = re.search(r'^\s*!!<', line)
+        if match_obj_out:
+            comment_depth -= 1
 
         if comment_depth>0:
             line = re.sub(r'^', '!'*comment_depth, line)
 
-        if comment_block_exit_flag:
-            comment_depth -= 1
+        if match_obj_in:
+            comment_depth += 1
 
         output.append(line)
 
