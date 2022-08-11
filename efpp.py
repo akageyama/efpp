@@ -169,8 +169,9 @@ def replace_period_in_member_accessor(string_in):
     string_work3 = remove_characters_in_comment(string_work2)
 
     # Regexp for the period letter '.' used as a member access operator.
-    pattern = r'[a-zA-Z][a-zA-Z_0-9]*?\)?\.[a-zA-Z][a-zA-Z_0-9]*?'
-    #  array(3).a02.mem01 ==> array(3)%a03%mem01
+    # pattern = r'[a-zA-Z][a-zA-Z_0-9]*?\)?\.[a-zA-Z][a-zA-Z_0-9]*?'  # before 2022.08.11
+    pattern = r'[a-zA-Z][a-zA-Z_0-9]*?(\([a-zA-Z_0-9]*\))?\.[a-zA-Z][a-zA-Z_0-9]*?'  # revised on 2022.08.11
+    #  array(3).a02.mem01 ==> array(3)%a02%mem01
     m = re.search(pattern, string_work3)
     ans = string_in
     if m:
