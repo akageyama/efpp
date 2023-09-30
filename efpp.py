@@ -500,6 +500,8 @@ def routine_name_macro(lines_in):
         if len(name)>0:
             progmodule_name = name[0]
             line = line.replace('__MODULE__', progmodule_name)
+            module_plus_linenum =  progmodule_name + '(' + str(lctr) + ')'
+            line = line.replace('__MODLINE__', module_plus_linenum )
         if len(name)==3:
             subroufunc_name = name[1] + '/' + name[2]
             line = line.replace('__FUNC__', subroufunc_name)
