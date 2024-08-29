@@ -1,10 +1,8 @@
 !!>
-  sample for efpp, ver.__EFPPVER__
+    sample for efpp, ver.__EFPPVER__
 !!<
 
-!*********************************************************
 module time_m
-!*********************************************************
   use constants_m
   implicit none
   private

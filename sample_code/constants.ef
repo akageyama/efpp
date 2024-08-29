@@ -1,13 +1,8 @@
 !!>
-  !!>
- !!>
-  sample for efpp, ver.__EFPPVER__
+     sample for efpp, ver.__EFPPVER__
 !!<
-   !!<
-  !!<
-!*********************************************************
+
 module constants_m
-!*********************************************************
   implicit none
 
   !<< f90 constants >>!

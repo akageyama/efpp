@@ -9,8 +9,8 @@
 
 .SUFFIXES:
 
-e03list := $(shell ls *.e03)   # e.g., example.e03
-filebase := $(basename $(notdir $(e03list))) # => example
+eflist := $(shell ls *.ef)   # e.g., example.ef
+filebase := $(basename $(notdir $(eflist))) # => example
 f90list := $(addsuffix .F90, $(filebase)) # => example.F90
 modlist := $(addsuffix .mod, $(filebase)) # => example.mod
 objlist := $(addsuffix .o, $(filebase)) # => example.o
@@ -27,7 +27,7 @@ runme: test
 	./test
 
 
-%.F90: %.e03
+%.F90: %.ef
 	../efpp.py $< > $@
 
 %.o: %.F90

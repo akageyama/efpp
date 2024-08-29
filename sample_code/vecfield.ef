@@ -1,10 +1,8 @@
 !!>
-  sample for efpp, ver.__EFPPVER__
+    sample for efpp, ver.__EFPPVER__
 !!<
 
-!*********************************************************
 module vecfield_m
-!*********************************************************
   use constants_m
   implicit none
 
@@ -26,54 +24,44 @@ module vecfield_m
 
 contains
 
-!_________________________________________________private__
-!
   function operator_dot_product(a,b)
     type(vecfield__t) <in> :: a, b
     real(DR), dimension(GRID_NX,  &
                         GRID_NY,  &
                         GRID_NZ) :: operator_dot_product
-!__________________________________________________________
-!
+
     operator_dot_product  = a.x*b.x
     operator_dot_product += a.y*b.y
     operator_dot_product += a.z*b.z
-
   end function operator_dot_product
 
 
-!_________________________________________________public___
-!
   subroutine vecfield__init(a)
     type(vecfield__t) <out> :: a
-!__________________________________________________________
-!
+
     !debugp ' hello. I am in a function named __FUNC__'
     !debugp '        which is in __MODULE__'
     !debugp '        this is at line number __LINE__'
     !debugp '        in short, i am in __MODFUNC__'
+    !debugp '        or i am in __MODLINE__'
 
     a.x(:,:,:) = 1.0_DR
     a.y(:,:,:) = 0.0_DR
     a.z(:,:,:) = 0.0_DR
-
   end subroutine vecfield__init
 
 
-!_________________________________________________public___
-!
   function vecfield__is_zero_?_(a) result(ans)
     type(vecfield__t) <in> :: a
     logical :: ans
-!__________________________________________________________
-!
+
     !debugp ' hello. I am in a function named __FUNC__'
     !debugp '        which is in __MODULE__'
     !debugp '        this is at line number __LINE__'
     !debugp '        in short, i am in __MODFUNC__'
+    !debugp '        or i am in __MODLINE__'
 
     ans = ( sum( a .dot. a ) == 0.0_DR )
-
   end function vecfield__is_zero_?_
 
 end module vecfield_m
