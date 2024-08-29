@@ -3,9 +3,9 @@
 #  efpp.py:
 #    Preprocessor for eFortran, a dialect of Modern Fortran.
 #
-#  developed by A. Kageyama (kage@port.kobe-u.ac.jp)
-#            on 2017.09.17, for cg-mhd project.
-#    revised on 2018.07.13, for general eFortran codes.
+#  History:
+#    Developed on 2017.09.17, for cg-mhd project.
+#      revised on 2018.07.13, for general eFortran codes.
 #
 #  Reference:
 #     S. Hosoyamada and A. Kageyama,
@@ -23,32 +23,30 @@ import sys
 def block_comment(lines_in):
 #=============================================
     """
-      sample input:
-      --------------------------
-                abc def ghijklmn opq
-                !!>
-                abc def ghijklmn opq
-                  !!>
-                  abc def ghijklmn opq
-                  abc def ghijklmn opq
-                  !!<
-                abc def ghijklmn opq
-                !!<
-                abc def ghijklmn opq
-
-      sample output
-      --------------------------
-                abc def ghijklmn opq
-                !!>
-                !abc def ghijklmn opq
-                !   !!>
-                !!  abc def ghijklmn opq
-                !!  abc def ghijklmn opq
-                !   !!<
-                !abc def ghijklmn opq
-                !!<
-                abc def ghijklmn opq
-      --------------------------
+      Sample
+              input:
+                        abc def ghijklmn opq
+                        !!>
+                        abc def ghijklmn opq
+                          !!>
+                          abc def ghijklmn opq
+                          abc def ghijklmn opq
+                          !!<
+                        abc def ghijklmn opq
+                        !!<
+                        abc def ghijklmn opq
+        
+              output:
+                        abc def ghijklmn opq
+                        !!>
+                        !abc def ghijklmn opq
+                        !   !!>
+                        !!  abc def ghijklmn opq
+                        !!  abc def ghijklmn opq
+                        !   !!<
+                        !abc def ghijklmn opq
+                        !!<
+                        abc def ghijklmn opq
     """
 
     output = list()
@@ -163,16 +161,59 @@ def read_alias_list_and_make_dict(filename):
 #=============================================
 def replace_period_in_member_accessor(string_in):
 #=============================================
+    """
+      -------------------------------+------------------------------
+       Replace from                  |   to
+      -------------------------------+------------------------------
+       call abc.def.g(f)            ==>  call abc%def%g(f)
+       call abc(:).def( 3 ).g(f)    ==>  call abc(:)%def( 3 )%g(f)
+       call abc(i).def.g(f)         ==>  call abc(i)%def%g(f)
+       call abc(i).def(3).g(f)      ==>  call abc(i)%def(3)%g(f)
+       call abc(i ).def(:).g(f)     ==>  call abc(i )%def(:)%g(f)
+       call abc(i+1).def(:).g(f)    ==>  call abc(i+1)%def(:)%g(f)
+       call abc(i-1).def(:).g(f)    ==>  call abc(i-1)%def(:)%g(f)
+       call abc( i-1).def(:).g(f)   ==>  call abc( i-1)%def(:)%g(f)
+       call abc( i-1 ).def(:).g(f)  ==>  call abc( i-1 )%def(:)%g(f)
+      -------------------------------+------------------------------
 
-    string_work1 = replace_characters_sandwiched_by_double_quotes(string_in)
-    string_work2 = replace_characters_sandwiched_by_single_quotes(string_work1)
-    string_work3 = remove_characters_in_comment(string_work2)
+       In Fortran, "Dot" is used in 
+          (1) logical operators ".and." and ".or."
+          (2) Decimal point numbers, e.g., 3.14 or 1.23e-4
+          (3) User-defined operators, say, ".curl.", ".dot.", etc.
+          (4) Text in comments
+       They should be unchanged.
 
-    # Regexp for the period letter '.' used as a member access operator.
-    # pattern = r'[a-zA-Z][a-zA-Z_0-9]*?\)?\.[a-zA-Z][a-zA-Z_0-9]*?'  # before 2022.08.11
-    pattern = r'[a-zA-Z][a-zA-Z_0-9]*?(\([a-zA-Z_0-9]*\))?\.[a-zA-Z][a-zA-Z_0-9]*?'  # revised on 2022.08.11
-    #  array(3).a02.mem01 ==> array(3)%a02%mem01
-    m = re.search(pattern, string_work3)
+      -------------------------------+------------------------------
+       if ( cond01 .and. cond02 )  ==> if ( cond01 .and. cond02 )
+                   3.14 + 1.23e-4  ==> 3.14 + 1.23e-4
+            vect_a .dot. vect_b    ==> vect_a .dot. vect_b
+                     "Like this."  ==>  "Like this."  
+              '... or like this.'  ==>  '... or like this.'
+      --------------------------------------------------------------
+
+
+      To achieve the above replacements (and non-replacements), we apply
+      the following procedure:
+
+      1. Find period-mark in the input line (string_in) that should not be replaced.
+      2. Replace the should-not-replace-period with any other character.
+      3. Make it "string_work0".
+      4. Find a remaining period-mark in "string_work0", which is a member-accessor.
+      5. Get the position (nth-character) of the member-accessor period-mark.
+      6. Replace the period-mark at nth-character of the original "string_in" to '%'.
+      7. Recursively call this function to apply all member-accessor period-mark.
+
+    """
+
+    string_work0 = replace_space_dot_string_dot_space(string_in)
+    string_work0 = replace_decimal_point_number_of_dot_and_digits(string_work0)
+    string_work0 = replace_decimal_point_number_of_dot_and_e_and_digits(string_work0)
+    string_work0 = replace_characters_sandwiched_by_single_quotes(string_work0)
+    string_work0 = replace_characters_sandwiched_by_double_quotes(string_work0)
+    string_work0 = remove_characters_in_comment(string_work0)
+
+    pattern = r'\.'  # revised on 2024.08.08
+    m = re.search(pattern, string_work0)
     ans = string_in
     if m:
         char_pos = string_in.find('.', m.start(), m.end()) # in the match
@@ -197,10 +238,14 @@ def replace_chars_in_string(string_in, pos_stt, pos_end, target_char):
 #=============================================
 def replace_characters_sandwiched_by_double_quotes(string_in):
 #=============================================
+    """
+     Replace from abcd "efg hijklmn"
+               to abcd "YYYYYYYYYYY"
+    """
     ans = string_in
     m = re.search(r'\".*?\"', string_in)
     if m:
-        string_tmp = replace_chars_in_string(string_in, m.start(), m.end()-1, 'X')
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.end(), 'X')
         ans = replace_characters_sandwiched_by_double_quotes(string_tmp)  # Recursion
     return ans
 
@@ -208,12 +253,62 @@ def replace_characters_sandwiched_by_double_quotes(string_in):
 #=============================================
 def replace_characters_sandwiched_by_single_quotes(string_in):
 #=============================================
+    """
+     Replace from abcd 'efg hijklmn'
+               to abcd 'YYYYYYYYYYY'
+    """
     ans = string_in
     m = re.search(r'\'.*?\'', string_in)
     if m:
-        string_tmp = replace_chars_in_string(string_in, m.start(), m.end()-1, 'Y')
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.end(), 'Y')
         ans = replace_characters_sandwiched_by_single_quotes(string_tmp)  # Recursion
     return ans
+
+
+#=============================================
+def replace_decimal_point_number_of_dot_and_digits(string_in):
+#=============================================
+    """
+     Replace from 0.14 +10.14 0.123 -3.14 .123 +0.123 -0.123 .123 +.1234 -.1234
+               to 0Z14 +10Z14 0Z123 -3Z14 Z123 +0Z123 -0Z123 Z123 +Z1234 -Z1234
+    """
+    ans = string_in
+    m = re.search(r'\.[0-9]', string_in)
+    if m:
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.start(), 'Z')
+        ans = replace_decimal_point_number_of_dot_and_digits(string_tmp)  # Recursion
+    return ans
+
+
+#=============================================
+def replace_decimal_point_number_of_dot_and_e_and_digits(string_in):
+#=============================================
+    """
+     Replace from 1.23e14 1.23e+14 1.23e-14 1.e14 1.e+14 1.e-14
+               to 1Z23e14 1Z23e+14 1Z23e-14 1Ze14 1Ze+14 1Ze-14
+    """
+    ans = string_in
+    m = re.search(r'[0-9]\.e[\+\-]?[0-9]+', string_in) 
+    if m:
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.end(), 'Z')
+        ans = replace_decimal_point_number_of_dot_and_e_and_digits(string_tmp)  # Recursion
+    return ans
+
+
+#=============================================
+def replace_space_dot_string_dot_space(string_in):
+#=============================================
+    """
+     Replace from a = .true. | a .cross. b | a = .not. b | routine(.abc.) 
+               to a = ZtrueZ | a ZcrossZ b | a = ZnotZ b | routine(ZabcZ)
+    """
+    ans = string_in
+    m = re.search(r'[ (]\.[a-zA-Z][a-zA-Z_0-9]*?\.[ )\n]', string_in)
+    if m:
+        string_tmp = replace_chars_in_string(string_in, m.start(), m.end()-1, 'Z')
+        ans = replace_space_dot_string_dot_space(string_tmp)  # Recursion
+    return ans
+
 
 #=============================================
 def remove_characters_in_comment(string_in):
@@ -221,9 +316,8 @@ def remove_characters_in_comment(string_in):
     return re.sub(r'!.*', '!', string_in)
 
 
-
 #=============================================
-def alias_decode(lines_in):
+def alias_decode(alias_list, lines_in):
 #=============================================
     """
     Converts strings. The rule is defined in alias_dict, which
@@ -313,7 +407,7 @@ def alias_decode(lines_in):
         }
 
     # Append user-defined macros
-    alias_dict.update(read_alias_list_and_make_dict('efpp_alias.list'))
+    alias_dict.update(read_alias_list_and_make_dict(alias_list))
 
     output = list()
     for line in lines_in:
@@ -579,7 +673,7 @@ def check_implicit_none(filename_in, lines_in):
 
 
 #=============================================
-def kutimer_docode(lines_in):
+def clock_decode(lines_in):
 #=============================================
     """
      # Before...
@@ -596,15 +690,15 @@ def kutimer_docode(lines_in):
      #
      # After...  (You should apply "subsidiary_caller" later.)
      #   ___________________________________________
-     #                          -call kutimer__start('  main')
-     #   call fluid%create(lat) -call kutimer__('  main','flu cr')
+     #                          -call Clock%start('  main')
+     #   call fluid%create(lat) -call Clock%lap  ('  main','flu cr')
      #   call fluid%set_initial(lat)
-     #                          -call kutimer__('  main','flu in')
-     #   do loop = 1 , loop_max -call kutimer__count
-     #     call pdf%shift(lat)  -call kutimer__('  main','pdfsht')
+     #                          -call Clock%lap  ('  main','flu in')
+     #   do loop = 1 , loop_max -call Clock%count
+     #     call pdf%shift(lat)  -call Clock%lap  ('  main','pdfsht')
      #   end do
-     #   call fluid%finalize    -call kutimer__end('  main')
-     #                          -call kutimer__print
+     #   call fluid%finalize    -call Clock%stop ('  main')
+     #                          -call Clock%print
      #
     """
     output = list()
@@ -622,23 +716,23 @@ def kutimer_docode(lines_in):
         match_pri = pat_pri.search(line)
         if match_stt:
             line = match_stt.group(1) + ' '
-            line += '-call kutimer__start(\'' + match_stt.group(2)
+            line += '-call Clock%start(\'' + match_stt.group(2)
             line += '\')' + '\n'
         if match_cal:
             line = match_cal.group(1) + ' '
-            line += '-call kutimer__(\'' + match_cal.group(2)
+            line += '-call Clock%lap  (\'' + match_cal.group(2)
             line += '\',\'' +  match_cal.group(3)
             line += '\')' + '\n'
         if match_cnt:
             line = match_cnt.group(1) + ' '
-            line += '-call kutimer__count\n'
+            line += '-call Clock%count\n'
         if match_end:
             line = match_end.group(1) + ' '
-            line += '-call kutimer__end(\'' + match_end.group(2)
+            line += '-call Clock%stop (\'' + match_end.group(2)
             line += '\')' + '\n'
         if match_pri:
             line = match_pri.group(1) + ' '
-            line += '-call kutimer__print' + match_pri.group(2) + '\n'
+            line += '-call Clock%print' + match_pri.group(2) + '\n'
         output.append(line)
 
     return output
@@ -662,11 +756,11 @@ def operator_decode(lines_in):
        "val /= 2" is not converted since
        it stands for val does not equal to 2.
     """
+
     output = list()
 
-    pat = re.compile(r'(.*)\s+?(\S+)' \
-                      r'\s+?([\+\-\*])=\s+?' \
-                      r'(.+)$')
+    pat = re.compile(r'(.*)\s+?(\S+)\s+?([\+\-\*])=\s+?(.+)$')
+
     for line in lines_in:
         match = pat.search(line)
         if match:
@@ -756,33 +850,33 @@ def debugp_decode(lines_in):
 
 
 #=============================================
-def efpp(filename_in):
+def efpp(filename_in, alias_list):
 #=============================================
 
     """    A preprocessor for Fortran 2003.
 
-         input: filename_in (e.g., 'main.e03')
+         input: filename_in (e.g., 'main.ef')
         output: standard out
     """
     with open(filename_in,'r') as f:
         lines = f.readlines()
-        # In the followings, we apply multiple docoders
-        # to 'lines. Their call-order is basically arbitrary.
-        # Only exception is that 'kutimer_decode' shoud be
-        # called before 'subsdiary_call_decode', because
-        # 'kutimer_decode' generates routine calls such
-        # as '...  -call kutimer__...', which is supposed
-        # to be processed by 'subsdiary_call_decode'.
-        #   One more condition, 'alias_docode' should be
-        # called before 'routine_name_macro', __LINE__ etc, 
+        # We are applying multiple docoders to 'lines. 
+        #
+        # The call-order is basically arbitrary, with
+        # the following two caveat:
+        #
+        # (1) 'clock_decode' shoud be called before 
+        #     'subsdiary_call_decode'.
+        # (2) 'alias_docode' should be called before 
+        #     'routine_name_macro', __LINE__ etc, 
         # could be included in 'efpp_alias.list'.
-        lines = kutimer_docode(lines)
+        lines = clock_decode(lines)
         lines = subsdiary_call_decode(lines)
         lines = block_comment(lines)
         lines = operator_decode(lines)
         lines = just_once_region(lines)
         lines = skip_counter(lines)
-        lines = alias_decode(lines)
+        lines = alias_decode(alias_list, lines)
         lines = debugp_decode(lines)
         lines = routine_name_macro(lines)
         lines = member_access_operator_macro(lines)
@@ -793,13 +887,16 @@ def efpp(filename_in):
             print(l,end='')
 
 
-
-
 if __name__ == '__main__':
 
     if len(sys.argv)==1:
         filename_in = input('enter filename_in name > ')
+        filename_alias_list = 'efpp_alias.list'
+    elif len(sys.argv)==2:
+        filename_in = sys.argv[1]
+        filename_alias_list = 'efpp_alias.list'
     else:
         filename_in = sys.argv[1]
+        filename_alias_list = sys.argv[2]
 
-    efpp(filename_in)
+    efpp(filename_in, filename_alias_list)
