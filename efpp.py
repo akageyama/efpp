@@ -780,46 +780,161 @@ def clock_decode(lines_in):
 def operator_decode(lines_in):
 #=============================================
     """
-      "... val += aa"     is converted into
-      "... val = val + aa"
+    Convert +=, -=, *= to ordinary Fortran assignments.
 
-      "... val -= aa"     is converted into
-      "... val = val - aa"
+    Handles array subscripts containing spaces and
+    single-line IF statements.
 
-      "if (xyz>0) xyz *=  2" is converted into
-      "if (xyz>0) xyz = xyz * 2"
-
-      but
-
-       "val /= 2" is not converted since
-       it stands for val does not equal to 2.
+    Strings and comments are not modified.
     """
 
-    output = list()
+    def mask_strings_and_comments(line):
+        masked = list(line)
+        quote = None
+        i = 0
 
-    pat_if = re.compile(
-        r'^(\s*if\s*\(.*\)\s+)(\S+)\s+([+\-*])=\s*(.+)$',
-        re.IGNORECASE
-    )
+        while i < len(line):
+            c = line[i]
 
-    pat = re.compile(r'^(\s*)(\S+)\s+([\+\-\*])=\s*(.+)$')
+            if quote is not None:
+                masked[i] = ' '
+                if c == quote:
+                    if i + 1 < len(line) and line[i + 1] == quote:
+                        masked[i + 1] = ' '
+                        i += 2
+                        continue
+                    quote = None
+
+            elif c in ("'", '"'):
+                quote = c
+                masked[i] = ' '
+
+            elif c == '!':
+                return ''.join(masked[:i]), i
+
+            i += 1
+
+        return ''.join(masked), len(line)
+
+    def split_if_prefix(text, masked):
+        """
+        Separate an optional single-line IF condition
+        from the assignment.
+        """
+        m = re.match(r'^\s*if\s*\(', masked, re.IGNORECASE)
+
+        if not m:
+            return '', text
+
+        depth = 1
+        i = m.end()
+
+        while i < len(masked) and depth > 0:
+            if masked[i] == '(':
+                depth += 1
+            elif masked[i] == ')':
+                depth -= 1
+            i += 1
+
+        if depth != 0:
+            return '', text
+
+        if i >= len(masked) or not masked[i].isspace():
+            return '', text
+
+        while i < len(masked) and masked[i].isspace():
+            i += 1
+
+        return text[:i], text[i:]
+
+    output = []
 
     for line in lines_in:
-        match = pat_if.search(line)
-        if match is None:
-            match = pat.search(line)
-        if match:
-            s = match.group(1)          # if (xyz>0)
-            s += match.group(2)         # if (xyz>0) xyz
-            s += ' = ' + match.group(2) # if (xyz>0) xyz = xyz
-            s += ' ' + match.group(3)   # if (xyz>0) xyz = xyz /
-            s += ' ' + match.group(4)   # if (xyz>0) xyz = xyz / 2
-            s += '\n'
-            output.append(s)
-        else:
+
+        masked, comment_pos = mask_strings_and_comments(line)
+        code = line[:comment_pos]
+        comment = line[comment_pos:]
+
+        # Locate a compound assignment outside strings.
+        m = re.search(r'([+\-*])=', masked)
+
+        if m is None:
             output.append(line)
+            continue
+
+        op = m.group(1)
+        left = code[:m.start()]
+        right = code[m.end():]
+
+        prefix, lhs = split_if_prefix(
+            left, masked[:m.start()]
+        )
+
+        # Preserve leading indentation.
+        if not prefix:
+            indent = re.match(r'^\s*', lhs).group()
+            prefix = indent
+            lhs = lhs[len(indent):]
+
+        lhs = lhs.strip()
+        rhs = right.strip()
+
+        # Preserve spaces immediately before a comment.
+        trailing_spaces = right[len(right.rstrip()):]
+
+        # Reject unsupported or incomplete assignments.
+        if not lhs or not rhs:
+            output.append(line)
+            continue
+
+        # Require an identifier at the start of the LHS.
+        if not re.match(r'^[A-Za-z_][A-Za-z_0-9]*', lhs):
+            output.append(line)
+            continue
+
+        # Check parentheses in the LHS.
+        depth = 0
+        valid = True
+
+        for c in lhs:
+            if c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+                if depth < 0:
+                    valid = False
+                    break
+
+        if depth != 0 or not valid:
+            output.append(line)
+            continue
+
+        converted = (
+            prefix + lhs + ' = ' + lhs
+            + ' ' + op + ' ' + rhs
+        )
+
+        # Preserve the original line ending.
+        newline = ''
+        if line.endswith('\r\n'):
+            newline = '\r\n'
+        elif line.endswith('\n'):
+            newline = '\n'
+
+        # Remove the line ending from the comment.
+        if newline and comment.endswith(newline):
+            comment = comment[:-len(newline)]
+
+        # Preserve spaces before an inline comment.
+        if not comment:
+            trailing_spaces = ''
+
+        output.append(
+            converted + trailing_spaces + comment + newline
+        )
 
     return output
+
 
 
 #=============================================
