@@ -797,13 +797,20 @@ def operator_decode(lines_in):
 
     output = list()
 
-    pat = re.compile(r'(.*)\s+?(\S+)\s+?([\+\-\*])=\s+?(.+)$')
+    pat_if = re.compile(
+        r'^(\s*if\s*\(.*\)\s+)(\S+)\s+([+\-*])=\s*(.+)$',
+        re.IGNORECASE
+    )
+
+    pat = re.compile(r'^(\s*)(\S+)\s+([\+\-\*])=\s*(.+)$')
 
     for line in lines_in:
-        match = pat.search(line)
+        match = pat_if.search(line)
+        if match is None:
+            match = pat.search(line)
         if match:
             s = match.group(1)          # if (xyz>0)
-            s += ' ' + match.group(2)   # if (xyz>0) xyz
+            s += match.group(2)         # if (xyz>0) xyz
             s += ' = ' + match.group(2) # if (xyz>0) xyz = xyz
             s += ' ' + match.group(3)   # if (xyz>0) xyz = xyz /
             s += ' ' + match.group(4)   # if (xyz>0) xyz = xyz / 2
