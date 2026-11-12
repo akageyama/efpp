@@ -162,64 +162,102 @@ def read_alias_list_and_make_dict(filename):
 def replace_period_in_member_accessor(string_in):
 #=============================================
     """
-      -------------------------------+------------------------------
-       Replace from                  |   to
-      -------------------------------+------------------------------
-       call abc.def.g(f)            ==>  call abc%def%g(f)
-       call abc(:).def( 3 ).g(f)    ==>  call abc(:)%def( 3 )%g(f)
-       call abc(i).def.g(f)         ==>  call abc(i)%def%g(f)
-       call abc(i).def(3).g(f)      ==>  call abc(i)%def(3)%g(f)
-       call abc(i ).def(:).g(f)     ==>  call abc(i )%def(:)%g(f)
-       call abc(i+1).def(:).g(f)    ==>  call abc(i+1)%def(:)%g(f)
-       call abc(i-1).def(:).g(f)    ==>  call abc(i-1)%def(:)%g(f)
-       call abc( i-1).def(:).g(f)   ==>  call abc( i-1)%def(:)%g(f)
-       call abc( i-1 ).def(:).g(f)  ==>  call abc( i-1 )%def(:)%g(f)
-      -------------------------------+------------------------------
-
-       In Fortran, "Dot" is used in 
-          (1) logical operators ".and." and ".or."
-          (2) Decimal point numbers, e.g., 3.14 or 1.23e-4
-          (3) User-defined operators, say, ".curl.", ".dot.", etc.
-          (4) Text in comments
-       They should be unchanged.
-
-      -------------------------------+------------------------------
-       if ( cond01 .and. cond02 )  ==> if ( cond01 .and. cond02 )
-                   3.14 + 1.23e-4  ==> 3.14 + 1.23e-4
-            vect_a .dot. vect_b    ==> vect_a .dot. vect_b
-                     "Like this."  ==>  "Like this."  
-              '... or like this.'  ==>  '... or like this.'
-      --------------------------------------------------------------
-
-
-      To achieve the above replacements (and non-replacements), we apply
-      the following procedure:
-
-      1. Find period-mark in the input line (string_in) that should not be replaced.
-      2. Replace the should-not-replace-period with any other character.
-      3. Make it "string_work0".
-      4. Find a remaining period-mark in "string_work0", which is a member-accessor.
-      5. Get the position (nth-character) of the member-accessor period-mark.
-      6. Replace the period-mark at nth-character of the original "string_in" to '%'.
-      7. Recursively call this function to apply all member-accessor period-mark.
-
+    Convert member-access dots to '%', preserving
+    Fortran strings, comments, numbers, and dot operators.
     """
 
-    string_work0 = replace_space_dot_string_dot_space(string_in)
-    string_work0 = replace_decimal_point_number_of_dot_and_digits(string_work0)
-    string_work0 = replace_decimal_point_number_of_dot_and_e_and_digits(string_work0)
-    string_work0 = replace_characters_sandwiched_by_single_quotes(string_work0)
-    string_work0 = replace_characters_sandwiched_by_double_quotes(string_work0)
-    string_work0 = remove_characters_in_comment(string_work0)
+    intrinsic_dots = {
+        "and", "or", "not", "eqv", "neqv",
+        "eq", "ne", "lt", "le", "gt", "ge",
+        "true", "false"
+    }
 
-    pattern = r'\.'  # revised on 2024.08.08
-    m = re.search(pattern, string_work0)
-    ans = string_in
-    if m:
-        char_pos = string_in.find('.', m.start(), m.end()) # in the match
-        string_work = replace_chars_in_string(string_in, char_pos, char_pos, '%')
-        ans = replace_period_in_member_accessor(string_work)
-    return ans
+    # Identify strings and comments.
+    protected = [False] * len(string_in)
+    quote = None
+    i = 0
+
+    while i < len(string_in):
+        c = string_in[i]
+
+        if quote is not None:
+            protected[i] = True
+            if c == quote:
+                if (i + 1 < len(string_in)
+                        and string_in[i + 1] == quote):
+                    protected[i + 1] = True
+                    i += 2
+                    continue
+                quote = None
+
+        elif c in ("'", '"'):
+            quote = c
+            protected[i] = True
+
+        elif c == "!":
+            for j in range(i, len(string_in)):
+                protected[j] = True
+            break
+
+        i += 1
+
+    # Mask strings and comments for lexical analysis.
+    code = "".join(
+        " " if protected[i] else c
+        for i, c in enumerate(string_in)
+    )
+
+    # Protect decimal points in numeric literals.
+    number_pattern = re.compile(
+        r"(?<![A-Za-z_0-9.])"
+        r"(?:"
+        r"\d+\.\d*"
+        r"|\.\d+"
+        r")"
+        r"(?:[eEdDqQ][+-]?\d+)?"
+        r"(?:_[A-Za-z_0-9]+)?"
+    )
+
+    for m in number_pattern.finditer(code):
+        for j in range(m.start(), m.end()):
+            if code[j] == ".":
+                protected[j] = True
+
+    # Protect user-defined operators in OPERATOR declarations.
+    operator_pattern = re.compile(
+        r"\boperator\s*\(\s*\.[A-Za-z][A-Za-z_0-9]*\.\s*\)",
+        re.IGNORECASE
+    )
+
+    for m in operator_pattern.finditer(code):
+        for j in range(m.start(), m.end()):
+            if code[j] == ".":
+                protected[j] = True
+
+    # Protect intrinsic and explicitly spaced dot operators.
+    dot_pattern = re.compile(
+        r"\.([A-Za-z][A-Za-z_0-9]*)\."
+    )
+
+    for m in dot_pattern.finditer(code):
+        name = m.group(1).lower()
+        left = m.start() - 1
+        right = m.end()
+
+        spaced = (
+            (left >= 0 and code[left].isspace())
+            or (right < len(code) and code[right].isspace())
+        )
+
+        if name in intrinsic_dots or spaced:
+            protected[m.start()] = True
+            protected[m.end() - 1] = True
+
+    # Replace remaining dots.
+    return "".join(
+        "%" if c == "." and not protected[i] else c
+        for i, c in enumerate(string_in)
+    )
 
 
 #=============================================
