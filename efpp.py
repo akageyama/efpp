@@ -484,6 +484,148 @@ def subsdiary_call_decode(lines_in):
 
 
 #=============================================
+def special_block_decode(lines_in):
+#=============================================
+    """Translate IF-style and legacy just_once/skip blocks with one stack.
+
+    Old spellings and their historical output formatting are preserved.
+    Every source line produces exactly one output line. A normal Fortran
+    block IF is tracked only to locate the end of a special IF block.
+    """
+    output = []
+    # (kind, counter, source_line); counter is used only for skip blocks.
+    stack = []
+
+    legacy_once_begin = re.compile(r'^([^=]+)=+<just_once>=+(.*)$')
+    legacy_once_end = re.compile(r'^([^=]+)=+</just_once>=+(.*)$')
+    legacy_skip_begin = re.compile(
+        r'^([^=]+)=+<skip\s+([a-zA-Z][a-zA-Z_0-9]*):(\s*.+)>=+(.*)$'
+    )
+    legacy_skip_end = re.compile(
+        r'^([^=]+)=+</skip\s+([a-zA-Z][a-zA-Z_0-9]*)>=+(.*)$'
+    )
+    new_once_begin = re.compile(
+        r'^(\s*)if\s*<just_once>\s*$', re.IGNORECASE
+    )
+    new_skip_begin = re.compile(
+        r'^(\s*)if\s*<skip\s+([A-Za-z][A-Za-z_0-9]*)\s*:\s*([^>\r\n]+?)\s*>\s*$',
+        re.IGNORECASE,
+    )
+    ordinary_if_begin = re.compile(
+        r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
+        re.IGNORECASE,
+    )
+    ordinary_if_end = re.compile(
+        r'^\s*(?:end\s*if|endif)(?:\s+[A-Za-z]\w*)?\s*$',
+        re.IGNORECASE,
+    )
+
+    def reject_nested_just_once():
+        if any(kind in ('just_once', 'legacy_just_once')
+               for kind, _, _ in stack):
+            raise ValueError('Nested just_once blocks are not allowed')
+
+    for lineno, line in enumerate(lines_in, 1):
+        # Legacy forms retain their original spelling-to-output mapping.
+        m = legacy_once_begin.search(line)
+        if m:
+            reject_nested_just_once()
+            stack.append(('legacy_just_once', None, lineno))
+            output.append(m.group(1) + 'if (just_once) then '
+                          + m.group(2) + '\n')
+            continue
+
+        m = legacy_once_end.search(line)
+        if m:
+            if not stack or stack[-1][0] != 'legacy_just_once':
+                raise ValueError(f'Mismatched legacy just_once end at line {lineno}')
+            stack.pop()
+            output.append(m.group(1) + 'just_once = .false. ; end if '
+                          + m.group(2) + '\n')
+            continue
+
+        m = legacy_skip_begin.search(line)
+        if m:
+            counter = m.group(2)
+            stack.append(('legacy_skip', counter, lineno))
+            output.append(m.group(1) + 'if(mod(' + counter + ','
+                          + m.group(3) + ')==0) then' + m.group(4) + '\n')
+            continue
+
+        m = legacy_skip_end.search(line)
+        if m:
+            counter = m.group(2)
+            if not stack or stack[-1][:2] != ('legacy_skip', counter):
+                raise ValueError(f'Mismatched legacy skip end at line {lineno}')
+            stack.pop()
+            output.append(m.group(1) + 'end if; ' + counter + ' = '
+                          + counter + ' + 1 ' + m.group(3) + '\n')
+            continue
+
+        # Ignore content inside strings and after an unquoted comment mark.
+        _, comment_pos = mask_strings_and_comments(line)
+        code = line[:comment_pos].rstrip('\r\n')
+        comment = line[comment_pos:]
+        trailing = code[len(code.rstrip(' \t')):]
+        code = code.rstrip(' \t')
+        newline = ('\r\n' if line.endswith('\r\n') else
+                   '\n' if line.endswith('\n') else '')
+        if newline and comment.endswith(newline):
+            comment = comment[:-len(newline)]
+
+        m = new_once_begin.match(code)
+        if m:
+            reject_nested_just_once()
+            stack.append(('just_once', None, lineno))
+            output.append(m.group(1) + 'if (just_once) then'
+                          + trailing + comment + newline)
+            continue
+
+        m = new_skip_begin.match(code)
+        if m:
+            indent, counter, interval = m.groups()
+            stack.append(('skip', counter, lineno))
+            output.append(indent + 'if(mod(' + counter + ','
+                          + interval.strip() + ')==0) then'
+                          + trailing + comment + newline)
+            continue
+
+        if ordinary_if_begin.match(code):
+            stack.append(('if', None, lineno))
+            output.append(line)
+            continue
+
+        if ordinary_if_end.match(code):
+            if not stack:
+                output.append(line)  # Leave ordinary Fortran errors to compiler.
+                continue
+            kind, counter, _ = stack[-1]
+            if kind.startswith('legacy_'):
+                raise ValueError(f'Mismatched end if at line {lineno}: '
+                                 f'legacy {kind} needs its legacy end marker')
+            stack.pop()
+            indent = re.match(r'^\s*', code).group()
+            if kind == 'just_once':
+                output.append(indent + 'just_once = .false. ; end if'
+                              + trailing + comment + newline)
+            elif kind == 'skip':
+                output.append(indent + 'end if; ' + counter + ' = '
+                              + counter + ' + 1'
+                              + trailing + comment + newline)
+            else:
+                output.append(line)
+            continue
+
+        output.append(line)
+
+    special_unclosed = [item for item in stack if item[0] != 'if']
+    if special_unclosed:
+        kind, _, lineno = special_unclosed[-1]
+        raise ValueError(f'Unclosed {kind} block starting at line {lineno}')
+    return output
+
+
+#=============================================
 def just_once_region(lines_in):
 #=============================================
     """
@@ -1241,8 +1383,7 @@ def efpp(filename_in, alias_list):
         lines = subsdiary_call_decode(lines)
         lines = block_comment(lines)
         lines = operator_decode(lines)
-        lines = just_once_region(lines)
-        lines = skip_counter(lines)
+        lines = special_block_decode(lines)
         lines = alias_decode(alias_list, lines)
         lines = debugp_decode(lines)
         lines = routine_name_macro(lines)

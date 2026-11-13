@@ -1,5 +1,9 @@
 import unittest
-from efpp import just_once_region, skip_counter
+from efpp import (
+    just_once_region,
+    skip_counter,
+    special_block_decode,
+)
 
 
 class TestJustOnce(unittest.TestCase):
@@ -213,6 +217,42 @@ class TestCombinedBlocks(unittest.TestCase):
 
         result = skip_counter(just_once_region(source))
         self.assertEqual(result, expected)
+
+    def test_complex_nested_blocks(self):
+        source = [
+            "if <just_once>\n",
+            "  if (DEBUG_MODE) then\n",
+            "    if <skip counter:8>\n",
+            "      call output()\n",
+            "    end if\n",
+            "  end if\n",
+            "end if\n",
+        ]
+
+        expected = [
+            "if (just_once) then\n",
+            "  if (DEBUG_MODE) then\n",
+            "    if(mod(counter,8)==0) then\n",
+            "      call output()\n",
+            "    end if; counter = counter + 1\n",
+            "  end if\n",
+            "just_once = .false. ; end if\n",
+        ]
+
+        result = skip_counter(just_once_region(source))
+        self.assertEqual(result, expected)
+
+    def test_crossed_blocks_rejected(self):
+        source = [
+            "if <just_once>\n",
+            "  ===<skip counter:8>===\n",
+            "    call output()\n",
+            "end if\n",
+            "  ===</skip counter>===\n",
+        ]
+
+        with self.assertRaises(ValueError):
+            special_block_decode(source)
 
 if __name__ == "__main__":
     unittest.main()
