@@ -487,33 +487,110 @@ def subsdiary_call_decode(lines_in):
 def just_once_region(lines_in):
 #=============================================
     """
-       program test
-         logical :: just_once = .true.
-         ==<just_once>==    ! you can put comment here.
-           call subsub('asdfasdf')
-         ==</just_once>==   ! end of just_once region.
-       end program test
+    Convert legacy and new just_once blocks to standard Fortran.
+
+    Legacy markers are preserved byte-for-byte in their historical output.
+    New syntax uses "if <just_once>" and "end if".
+
+    A stack distinguishes ordinary IF blocks from just_once blocks.
+    Nested just_once blocks (including mixed syntax) are not permitted.
     """
-    output = list()
+
+    output = []
+    stack = []
+
     pat_begin = re.compile(r'^([^=]+)=+<just_once>=+(.*)$')
     pat_end = re.compile(r'^([^=]+)=+</just_once>=+(.*)$')
 
+    pat_new_begin = re.compile(
+        r'^(\s*)if\s*<just_once>\s*$', re.IGNORECASE
+    )
+    pat_if_begin = re.compile(
+        r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
+        re.IGNORECASE
+    )
+    pat_if_end = re.compile(
+        r'^\s*(?:end\s*if|endif)\s*$', re.IGNORECASE
+    )
+
     for line in lines_in:
+        # Keep the existing legacy transformations unchanged.
         match_begin = pat_begin.search(line)
         match_end = pat_end.search(line)
+
         if match_begin:
+            if 'just_once' in stack or 'legacy_just_once' in stack:
+                raise ValueError('Nested just_once blocks are not allowed')
+            stack.append('legacy_just_once')
             s = match_begin.group(1)
             s += 'if (just_once) then'
             s += ' ' + match_begin.group(2)
             s += '\n'
-        elif match_end:
+            output.append(s)
+            continue
+
+        if match_end:
+            if not stack or stack[-1] != 'legacy_just_once':
+                raise ValueError('Mismatched legacy just_once end marker')
+            stack.pop()
             s = match_end.group(1)
             s += 'just_once = .false. ; end if'
             s += ' ' + match_end.group(2)
             s += '\n'
-        else:
-            s = line
-        output.append(s)
+            output.append(s)
+            continue
+
+        # Examine code only; preserve string contents and inline comments.
+        masked, comment_pos = mask_strings_and_comments(line)
+        code = line[:comment_pos].rstrip('\r\n')
+        comment = line[comment_pos:]
+        spaces_before_comment = code[len(code.rstrip(' \t')):]
+        code = code.rstrip(' \t')
+
+        newline = ''
+        if line.endswith('\r\n'):
+            newline = '\r\n'
+        elif line.endswith('\n'):
+            newline = '\n'
+        if newline and comment.endswith(newline):
+            comment = comment[:-len(newline)]
+
+        m = pat_new_begin.match(code)
+        if m:
+            if 'just_once' in stack or 'legacy_just_once' in stack:
+                raise ValueError('Nested just_once blocks are not allowed')
+            stack.append('just_once')
+            output.append(
+                m.group(1) + 'if (just_once) then'
+                + spaces_before_comment + comment + newline
+            )
+            continue
+
+        if pat_if_begin.match(code):
+            stack.append('if')
+            output.append(line)
+            continue
+
+        if pat_if_end.match(code) and stack:
+            block_type = stack.pop()
+            if block_type == 'just_once':
+                indent = re.match(r'^\s*', code).group()
+                output.append(
+                    indent + 'just_once = .false. ; end if'
+                    + spaces_before_comment + comment + newline
+                )
+            elif block_type == 'legacy_just_once':
+                raise ValueError(
+                    'Mismatched just_once end: use ==</just_once>=='
+                )
+            else:
+                output.append(line)
+            continue
+
+        output.append(line)
+
+    if 'just_once' in stack or 'legacy_just_once' in stack:
+        raise ValueError('Unclosed just_once block')
 
     return output
 
