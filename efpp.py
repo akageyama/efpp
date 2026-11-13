@@ -791,22 +791,15 @@ def mask_strings_and_comments(line):
 
 
 #=============================================
-def operator_decode_single(lines_in):
+def operator_decode_single(statement):
 #=============================================
     """
-    Convert +=, -=, *= to ordinary Fortran assignments.
-
-    Handles array subscripts containing spaces and
-    single-line IF statements.
-
-    Strings and comments are not modified.
+    Convert a compound assignment in a single Fortran
+    statement. The input and output contain no newline,
+    comment, or statement-separating semicolon.
     """
 
     def split_if_prefix(text, masked):
-        """
-        Separate an optional single-line IF condition
-        from the assignment.
-        """
         m = re.match(r'^\s*if\s*\(', masked, re.IGNORECASE)
 
         if not m:
@@ -833,103 +826,52 @@ def operator_decode_single(lines_in):
 
         return text[:i], text[i:]
 
-    output = []
+    masked, _ = mask_strings_and_comments(statement)
 
-    for line in lines_in:
+    m = re.search(r'([+\-*])=', masked)
+    if m is None:
+        return statement
 
-        masked, comment_pos = mask_strings_and_comments(line)
-        code = line[:comment_pos]
-        comment = line[comment_pos:]
+    op = m.group(1)
+    left = statement[:m.start()]
+    right = statement[m.end():]
 
-        # Locate a compound assignment outside strings.
-        m = re.search(r'([+\-*])=', masked)
+    prefix, lhs = split_if_prefix(left, masked[:m.start()])
 
-        if m is None:
-            output.append(line)
-            continue
+    if not prefix:
+        indent = re.match(r'^\s*', lhs).group()
+        prefix = indent
+        lhs = lhs[len(indent):]
 
-        op = m.group(1)
-        left = code[:m.start()]
-        right = code[m.end():]
+    lhs = lhs.strip()
+    rhs = right.strip()
 
-        # Separate preceding statements at the last semicolon.
-        # Semicolons inside strings are ignored.
-        semicolon_pos = masked.rfind(';', 0, m.start())
+    # Preserve trailing whitespace.
+    trailing_spaces = right[len(right.rstrip(' \t')):]
 
-        preceding = ''
-        if semicolon_pos >= 0:
-            preceding = left[:semicolon_pos + 1]
-            left = left[semicolon_pos + 1:]
+    if not lhs or not rhs:
+        return statement
 
-        prefix, lhs = split_if_prefix(
-            left, masked[:m.start()]
-        )
+    if not re.match(r'^[A-Za-z_][A-Za-z_0-9]*', lhs):
+        return statement
 
-        # Preserve leading indentation.
-        if not prefix:
-            indent = re.match(r'^\s*', lhs).group()
-            prefix = indent
-            lhs = lhs[len(indent):]
+    # Check balanced parentheses in the LHS.
+    depth = 0
+    for c in lhs:
+        if c == '(':
+            depth += 1
+        elif c == ')':
+            depth -= 1
+            if depth < 0:
+                return statement
 
-        lhs = lhs.strip()
-        rhs = right.strip()
+    if depth != 0:
+        return statement
 
-        # Preserve spaces immediately before a comment.
-        trailing_spaces = right[len(right.rstrip()):]
-
-        # Reject unsupported or incomplete assignments.
-        if not lhs or not rhs:
-            output.append(line)
-            continue
-
-        # Require an identifier at the start of the LHS.
-        if not re.match(r'^[A-Za-z_][A-Za-z_0-9]*', lhs):
-            output.append(line)
-            continue
-
-        # Check parentheses in the LHS.
-        depth = 0
-        valid = True
-
-        for c in lhs:
-            if c == '(':
-                depth += 1
-            elif c == ')':
-                depth -= 1
-                if depth < 0:
-                    valid = False
-                    break
-
-        if depth != 0 or not valid:
-            output.append(line)
-            continue
-
-        converted = (
-            preceding + prefix + lhs + ' = ' + lhs
-            + ' ' + op + ' ' + rhs
-        )
-
-        # Preserve the original line ending.
-        newline = ''
-        if line.endswith('\r\n'):
-            newline = '\r\n'
-        elif line.endswith('\n'):
-            newline = '\n'
-
-        # Remove the line ending from the comment.
-        if newline and comment.endswith(newline):
-            comment = comment[:-len(newline)]
-
-        # Preserve spaces before an inline comment.
-        if not comment:
-            trailing_spaces = ''
-
-        output.append(
-            converted + trailing_spaces + comment + newline
-        )
-
-    return output
-
+    return (
+        prefix + lhs + ' = ' + lhs
+        + ' ' + op + ' ' + rhs + trailing_spaces
+    )
 
 
 #=============================================
@@ -985,11 +927,11 @@ def operator_decode(lines_in):
 
             # Reuse the existing single-statement converter.
             converted = operator_decode_single(
-                [statement + '\n']
-            )[0]
+                statement.rstrip('\r\n')
+            )
 
             converted_parts.append(
-                converted.rstrip('\n') + delimiter
+                converted + delimiter
             )
 
         # Preserve the original line ending.
