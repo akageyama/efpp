@@ -1,5 +1,5 @@
 import unittest
-from efpp import just_once_region
+from efpp import just_once_region, skip_counter
 
 
 class TestJustOnce(unittest.TestCase):
@@ -142,6 +142,77 @@ class TestJustOnce(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             just_once_region(source)
+
+
+class TestSkip(unittest.TestCase):
+
+    def test_legacy_skip(self):
+        source = [
+            "  ===<skip counter:8>===\n",
+            "    call output()\n",
+            "  ===</skip counter>===\n",
+        ]
+        expected = [
+            "  if(mod(counter,8)==0) then\n",
+            "    call output()\n",
+            "  end if; counter = counter + 1 \n",
+        ]
+        self.assertEqual(skip_counter(source), expected)
+
+    def test_new_skip(self):
+        source = [
+            "  if <skip counter:8>\n",
+            "    call output()\n",
+            "  end if\n",
+        ]
+        expected = [
+            "  if(mod(counter,8)==0) then\n",
+            "    call output()\n",
+            "  end if; counter = counter + 1\n",
+        ]
+        self.assertEqual(skip_counter(source), expected)
+
+class TestCombinedBlocks(unittest.TestCase):
+
+    def test_just_once_containing_skip(self):
+        source = [
+            "if <just_once>\n",
+            "  if <skip counter:8>\n",
+            "    call output()\n",
+            "  end if\n",
+            "end if\n",
+        ]
+
+        expected = [
+            "if (just_once) then\n",
+            "  if(mod(counter,8)==0) then\n",
+            "    call output()\n",
+            "  end if; counter = counter + 1\n",
+            "just_once = .false. ; end if\n",
+        ]
+
+        result = skip_counter(just_once_region(source))
+        self.assertEqual(result, expected)
+
+    def test_skip_containing_just_once(self):
+        source = [
+            "if <skip counter:8>\n",
+            "  if <just_once>\n",
+            "    call initialize()\n",
+            "  end if\n",
+            "end if\n",
+        ]
+
+        expected = [
+            "if(mod(counter,8)==0) then\n",
+            "  if (just_once) then\n",
+            "    call initialize()\n",
+            "  just_once = .false. ; end if\n",
+            "end if; counter = counter + 1\n",
+        ]
+
+        result = skip_counter(just_once_region(source))
+        self.assertEqual(result, expected)
 
 if __name__ == "__main__":
     unittest.main()

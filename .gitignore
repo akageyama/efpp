@@ -102,3 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Generated files from eFortran integration tests
+/tests/test_blocks.F90
+/tests/test_blocks

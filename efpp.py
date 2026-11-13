@@ -505,6 +505,12 @@ def just_once_region(lines_in):
     pat_new_begin = re.compile(
         r'^(\s*)if\s*<just_once>\s*$', re.IGNORECASE
     )
+    # Treat a new-style skip block as an ordinary IF for nesting purposes.
+    # skip_counter() transforms it later in the pipeline.
+    pat_skip_begin = re.compile(
+        r'^\s*if\s*<skip\s+[A-Za-z]\w*\s*:\s*[^>\r\n]+>\s*$',
+        re.IGNORECASE
+    )
     pat_if_begin = re.compile(
         r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
         re.IGNORECASE
@@ -566,6 +572,11 @@ def just_once_region(lines_in):
             )
             continue
 
+        if pat_skip_begin.match(code):
+            stack.append('if')
+            output.append(line)
+            continue
+
         if pat_if_begin.match(code):
             stack.append('if')
             output.append(line)
@@ -598,40 +609,117 @@ def just_once_region(lines_in):
 #=============================================
 def skip_counter(lines_in):
 #=============================================
+    """Translate legacy and IF-style skip blocks without changing line count.
+
+    Legacy syntax (unchanged output):
+        ===<skip counter:8>===
+        ===</skip counter>===
+
+    New syntax:
+        if <skip counter:8>
+        end if
+
+    A stack tracks normal IF blocks and the counter associated with each
+    new-style skip block. Legacy markers keep their historical formatting.
     """
-        # program test
-        #   inte(SI) :: ctr=0
-        #   inte(SI) :: i
-        #   do i = 1 , 200
-        #     ===<skip ctr:8>===  ! you can put comment.
-        #       call subsub('asdfasdf',i)
-        #     ===</skip ctr>===   ! end of skip block.
-        #   end do
-        # end program test
-    """
-    output = list()
+    output = []
+    stack = []  # entries: (kind, counter) with kind 'if', 'skip', 'legacy_skip'
+
+    # Preserve the original legacy matching and formatting.
     pat_begin = re.compile(r'^([^=]+)=+<skip\s+([a-zA-Z][a-zA-Z_0-9]*):(\s*.+)>=+(.*)$')
     pat_end = re.compile(r'^([^=]+)=+</skip\s+([a-zA-Z][a-zA-Z_0-9]*)>=+(.*)$')
 
+    pat_new_begin = re.compile(
+        r'^(\s*)if\s*<skip\s+([A-Za-z][A-Za-z_0-9]*)\s*:\s*([^>\r\n]+?)\s*>\s*$',
+        re.IGNORECASE
+    )
+    pat_if_begin = re.compile(
+        r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
+        re.IGNORECASE
+    )
+    pat_if_end = re.compile(r'^\s*(?:end\s*if|endif)\s*$', re.IGNORECASE)
+    # just_once_region() runs before skip_counter() and generates this closing
+    # statement. It must close the corresponding IF on our stack too.
+    pat_just_once_end = re.compile(
+        r'^\s*just_once\s*=\s*\.false\.\s*;\s*end\s*if\s*$',
+        re.IGNORECASE
+    )
+
     for line in lines_in:
-        match_begin = pat_begin.search(line)
-        match_end = pat_end.search(line)
-        if match_begin:
-            s = match_begin.group(1)
-            s += 'if(mod(' + match_begin.group(2)
-            s += ',' + match_begin.group(3)
-            s += ')==0) then' + match_begin.group(4)
-            s += '\n'
-        elif match_end:
-            s = match_end.group(1)
+        legacy_begin = pat_begin.search(line)
+        legacy_end = pat_end.search(line)
+
+        if legacy_begin:
+            counter = legacy_begin.group(2)
+            stack.append(('legacy_skip', counter))
+            s = legacy_begin.group(1)
+            s += 'if(mod(' + counter
+            s += ',' + legacy_begin.group(3)
+            s += ')==0) then' + legacy_begin.group(4)
+            output.append(s + '\n')
+            continue
+
+        if legacy_end:
+            counter = legacy_end.group(2)
+            if not stack or stack[-1] != ('legacy_skip', counter):
+                raise ValueError('Mismatched legacy skip end marker')
+            stack.pop()
+            s = legacy_end.group(1)
             s += 'end if; '
-            s += match_end.group(2) + ' = '
-            s += match_end.group(2) + ' + 1'
-            s += ' ' + match_end.group(3)
-            s += '\n'
-        else:
-            s = line
-        output.append(s)
+            s += counter + ' = ' + counter + ' + 1'
+            s += ' ' + legacy_end.group(3)
+            output.append(s + '\n')
+            continue
+
+        masked, comment_pos = mask_strings_and_comments(line)
+        code = line[:comment_pos].rstrip('\r\n')
+        comment = line[comment_pos:]
+        spaces_before_comment = code[len(code.rstrip(' \t')):]
+        code = code.rstrip(' \t')
+
+        newline = '\r\n' if line.endswith('\r\n') else ('\n' if line.endswith('\n') else '')
+        if newline and comment.endswith(newline):
+            comment = comment[:-len(newline)]
+
+        m = pat_new_begin.match(code)
+        if m:
+            indent, counter, interval = m.groups()
+            stack.append(('skip', counter))
+            output.append(
+                indent + 'if(mod(' + counter + ',' + interval.strip()
+                + ')==0) then' + spaces_before_comment + comment + newline
+            )
+            continue
+
+        if pat_if_begin.match(code):
+            stack.append(('if', None))
+            output.append(line)
+            continue
+
+        if pat_just_once_end.match(code):
+            if stack and stack[-1][0] == 'if':
+                stack.pop()
+            output.append(line)
+            continue
+
+        if pat_if_end.match(code) and stack:
+            kind, counter = stack.pop()
+            if kind == 'skip':
+                indent = re.match(r'^\s*', code).group()
+                output.append(
+                    indent + 'end if; ' + counter + ' = ' + counter + ' + 1'
+                    + spaces_before_comment + comment + newline
+                )
+            elif kind == 'legacy_skip':
+                raise ValueError('Mismatched skip end: use ===</skip counter>===')
+            else:
+                output.append(line)
+            continue
+
+        output.append(line)
+
+    if any(kind != 'if' for kind, _ in stack):
+        raise ValueError('Unclosed skip block')
 
     return output
 
