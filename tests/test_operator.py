@@ -105,5 +105,32 @@ class TestOperator(unittest.TestCase):
             ["  x = x + y       ; call update()\n"]
         )
 
+    def test_semicolon_in_string(self):
+        result = operator_decode([
+            '  x += len("a;b")\n'
+        ])
+        self.assertEqual(
+            result,
+            ['  x = x + len("a;b")\n']
+        )
+
+    def test_no_final_newline(self):
+        result = operator_decode([
+            "  x += y"
+        ])
+        self.assertEqual(
+            result,
+            ["  x = x + y"]
+        )
+
+    def test_windows_line_ending(self):
+        result = operator_decode([
+            "  x += y\r\n"
+        ])
+        self.assertEqual(
+            result,
+            ["  x = x + y\r\n"]
+        )
+
 if __name__ == "__main__":
     unittest.main()
