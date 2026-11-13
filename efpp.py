@@ -116,10 +116,23 @@ def read_alias_list_and_make_dict(filename):
        #  000  '" right"  # comment...    '
 
     alias_dict = dict()
+
+    def register_alias(left, right, lineno):
+        if left in alias_dict:
+            print(
+                f"efpp: error: duplicate alias '{left}' "
+                f"at {filename}:{lineno}",
+                file=sys.stderr
+            )
+            sys.exit(1)
+
+        alias_dict[left] = right
+
     left = ''
     right = ''
+
     with open(filename) as f:
-        for line in f:
+        for lineno, line in enumerate(f, start=1):
             m_blank_line = re.match(patt_blank_line, line)
             m_comment_line = re.match(patt_comment_line, line)
             m_both_left_and_right = re.match(patt_both_left_and_right, line)
@@ -131,17 +144,17 @@ def read_alias_list_and_make_dict(filename):
             elif m_both_left_and_right:
                 left = m_both_left_and_right.group(1)
                 right = m_both_left_and_right.group(2)
-                alias_dict[left] = right
+                register_alias(left, right, lineno)
                 left, right='', ''
             elif m_left_hand_side:
                 left = m_left_hand_side.group(1)
                 if right:
-                    alias_dict[left] = right
+                    register_alias(left, right, lineno)
                     left, right='', ''
             elif m_right_hand_side:
                 right = m_right_hand_side.group(1)
                 if left:
-                    alias_dict[left] = right
+                    register_alias(left, right, lineno)
                     left, right='', ''
             elif m_left_or_right:
                 if left != '':
@@ -149,11 +162,24 @@ def read_alias_list_and_make_dict(filename):
                 else:
                     left = m_left_or_right.group(1)
                 if left != '' and right !='':
-                    alias_dict[left] = right
+                    register_alias(left, right, lineno)
                     left, right='', ''
             else:
-                print("error. unknown pattern.")
-                sys.exit()
+                print(
+                    f"efpp: error: invalid alias definition "
+                    f"at {filename}:{lineno}",
+                    file=sys.stderr
+                )
+                sys.exit(1)
+
+    # Check for an incomplete alias definition at EOF.
+    if left or right:
+        print(
+            f"efpp: error: incomplete alias definition "
+            f"at end of {filename}",
+            file=sys.stderr
+        )
+        sys.exit(1)
 
     return alias_dict
 
@@ -1075,4 +1101,11 @@ if __name__ == '__main__':
         filename_in = sys.argv[1]
         filename_alias_list = sys.argv[2]
 
-    efpp(filename_in, filename_alias_list)
+    try:
+        efpp(filename_in, filename_alias_list)
+    except FileNotFoundError as e:
+        print(
+            f"efpp: error: file not found: {e.filename}",
+            file=sys.stderr
+        )
+        sys.exit(1)
