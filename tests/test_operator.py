@@ -96,5 +96,14 @@ class TestOperator(unittest.TestCase):
             ["  x = x + 1; y = y + 2\n"]
         )
 
+    def test_spaces_before_semicolon(self):
+        result = operator_decode([
+            "  x += y       ; call update()\n"
+        ])
+        self.assertEqual(
+            result,
+            ["  x = x + y       ; call update()\n"]
+        )
+
 if __name__ == "__main__":
     unittest.main()

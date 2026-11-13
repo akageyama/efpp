@@ -973,10 +973,12 @@ def operator_decode(lines_in):
         converted_parts = []
 
         for part in parts:
-            # Keep the semicolon outside the assignment.
+            # Preserve whitespace before a semicolon.
             if part.endswith(';'):
                 statement = part[:-1]
-                delimiter = ';'
+                spaces_before_semicolon = statement[len(statement.rstrip(' \t')):]
+                statement = statement.rstrip(' \t')
+                delimiter = spaces_before_semicolon + ';'
             else:
                 statement = part
                 delimiter = ''
