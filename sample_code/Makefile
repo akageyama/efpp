@@ -22,13 +22,16 @@ objlist := $(addsuffix .o, $(filebase)) # => example.o
 .PHONY: clean
 
 FC = gfortran
+EFPP = ../efpp.py
 
 runme: test
 	./test
 
 
 %.F90: %.ef
-	../efpp.py $< > $@
+	@rm -f $@.tmp
+	@$(EFPP) $< > $@.tmp || { rm -f $@.tmp; exit 1; }
+	@mv -f $@.tmp $@
 
 %.o: %.F90
 	$(FC) $(FFLAGS) -o $@ -c $<
