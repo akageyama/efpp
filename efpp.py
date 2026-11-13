@@ -172,40 +172,14 @@ def replace_period_in_member_accessor(string_in):
         "true", "false"
     }
 
-    # Identify strings and comments.
-    protected = [False] * len(string_in)
-    quote = None
-    i = 0
 
-    while i < len(string_in):
-        c = string_in[i]
+    # Mask strings and comments using the common lexer.
+    code, comment_pos = mask_strings_and_comments(string_in)
 
-        if quote is not None:
-            protected[i] = True
-            if c == quote:
-                if (i + 1 < len(string_in)
-                        and string_in[i + 1] == quote):
-                    protected[i + 1] = True
-                    i += 2
-                    continue
-                quote = None
-
-        elif c in ("'", '"'):
-            quote = c
-            protected[i] = True
-
-        elif c == "!":
-            for j in range(i, len(string_in)):
-                protected[j] = True
-            break
-
-        i += 1
-
-    # Mask strings and comments for lexical analysis.
-    code = "".join(
-        " " if protected[i] else c
-        for i, c in enumerate(string_in)
-    )
+    protected = [
+        original == "." and masked != "."
+        for original, masked in zip(string_in, code)
+    ]
 
     # Protect decimal points in numeric literals.
     number_pattern = re.compile(
@@ -777,6 +751,46 @@ def clock_decode(lines_in):
 
 
 #=============================================
+def mask_strings_and_comments(line):
+#=============================================
+    """
+    Mask Fortran string literals and comments with spaces.
+
+    Returns:
+        masked: same-length string with literals and comments masked
+        comment_pos: position of the first unquoted '!'
+                     or len(line) if no comment exists
+    """
+    masked = list(line)
+    quote = None
+    i = 0
+
+    while i < len(line):
+        c = line[i]
+
+        if quote is not None:
+            masked[i] = ' '
+            if c == quote:
+                if i + 1 < len(line) and line[i + 1] == quote:
+                    masked[i + 1] = ' '
+                    i += 2
+                    continue
+                quote = None
+
+        elif c in ("'", '"'):
+            quote = c
+            masked[i] = ' '
+
+        elif c == '!':
+            masked[i:] = [' '] * (len(line) - i)
+            return ''.join(masked), i
+
+        i += 1
+
+    return ''.join(masked), len(line)
+
+
+#=============================================
 def operator_decode(lines_in):
 #=============================================
     """
@@ -787,34 +801,6 @@ def operator_decode(lines_in):
 
     Strings and comments are not modified.
     """
-
-    def mask_strings_and_comments(line):
-        masked = list(line)
-        quote = None
-        i = 0
-
-        while i < len(line):
-            c = line[i]
-
-            if quote is not None:
-                masked[i] = ' '
-                if c == quote:
-                    if i + 1 < len(line) and line[i + 1] == quote:
-                        masked[i + 1] = ' '
-                        i += 2
-                        continue
-                    quote = None
-
-            elif c in ("'", '"'):
-                quote = c
-                masked[i] = ' '
-
-            elif c == '!':
-                return ''.join(masked[:i]), i
-
-            i += 1
-
-        return ''.join(masked), len(line)
 
     def split_if_prefix(text, masked):
         """
