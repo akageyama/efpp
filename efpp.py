@@ -791,7 +791,7 @@ def mask_strings_and_comments(line):
 
 
 #=============================================
-def operator_decode(lines_in):
+def operator_decode_single(lines_in):
 #=============================================
     """
     Convert +=, -=, *= to ordinary Fortran assignments.
@@ -852,6 +852,15 @@ def operator_decode(lines_in):
         left = code[:m.start()]
         right = code[m.end():]
 
+        # Separate preceding statements at the last semicolon.
+        # Semicolons inside strings are ignored.
+        semicolon_pos = masked.rfind(';', 0, m.start())
+
+        preceding = ''
+        if semicolon_pos >= 0:
+            preceding = left[:semicolon_pos + 1]
+            left = left[semicolon_pos + 1:]
+
         prefix, lhs = split_if_prefix(
             left, masked[:m.start()]
         )
@@ -896,7 +905,7 @@ def operator_decode(lines_in):
             continue
 
         converted = (
-            prefix + lhs + ' = ' + lhs
+            preceding + prefix + lhs + ' = ' + lhs
             + ' ' + op + ' ' + rhs
         )
 
@@ -921,6 +930,83 @@ def operator_decode(lines_in):
 
     return output
 
+
+
+#=============================================
+def operator_decode(lines_in):
+#=============================================
+    """
+    Convert compound assignments in semicolon-separated
+    Fortran statements, preserving strings and comments.
+    """
+    output = []
+
+    for line in lines_in:
+        masked, comment_pos = mask_strings_and_comments(line)
+
+        code = line[:comment_pos]
+        comment = line[comment_pos:]
+
+        # Locate semicolons outside string literals.
+        positions = [
+            i for i, c in enumerate(masked[:comment_pos])
+            if c == ';'
+        ]
+
+        # Preserve whitespace immediately before a comment.
+        trailing_spaces = ''
+
+        if comment_pos < len(line):
+            trailing_spaces = code[len(code.rstrip(' \t')):]
+            code = code.rstrip(' \t')
+
+        # Split while retaining semicolons.
+        parts = []
+        start = 0
+
+        for pos in positions:
+            parts.append(code[start:pos + 1])
+            start = pos + 1
+
+        parts.append(code[start:])
+
+        converted_parts = []
+
+        for part in parts:
+            # Keep the semicolon outside the assignment.
+            if part.endswith(';'):
+                statement = part[:-1]
+                delimiter = ';'
+            else:
+                statement = part
+                delimiter = ''
+
+            # Reuse the existing single-statement converter.
+            converted = operator_decode_single(
+                [statement + '\n']
+            )[0]
+
+            converted_parts.append(
+                converted.rstrip('\n') + delimiter
+            )
+
+        # Preserve the original line ending.
+        newline = ''
+        if line.endswith('\r\n'):
+            newline = '\r\n'
+        elif line.endswith('\n'):
+            newline = '\n'
+
+        # Remove the newline from the comment, if present.
+        if newline and comment.endswith(newline):
+            comment = comment[:-len(newline)]
+
+        output.append(
+            ''.join(converted_parts)
+            + trailing_spaces + comment + newline
+        )
+
+    return output
 
 
 #=============================================

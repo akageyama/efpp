@@ -69,5 +69,32 @@ class TestOperator(unittest.TestCase):
             ["  x = x + y  ! update x\n"]
         )
 
+    def test_assignment_with_string_rhs(self):
+        result = operator_decode([
+            '  x += len("a+b")\n'
+        ])
+        self.assertEqual(
+            result,
+            ['  x = x + len("a+b")\n']
+        )
+
+    def test_semicolon_separated_statements(self):
+        result = operator_decode([
+            "  x = 1; y += 2\n"
+        ])
+        self.assertEqual(
+            result,
+            ["  x = 1; y = y + 2\n"]
+        )
+
+    def test_multiple_compound_assignments(self):
+        result = operator_decode([
+            "  x += 1; y += 2\n"
+        ])
+        self.assertEqual(
+            result,
+            ["  x = x + 1; y = y + 2\n"]
+        )
+
 if __name__ == "__main__":
     unittest.main()
