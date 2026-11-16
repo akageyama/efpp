@@ -106,3 +106,9 @@ venv.bak/
 # Generated files from eFortran integration tests
 /tests/test_blocks.F90
 /tests/test_blocks
+
+# Local VS Code settings
+.vscode/
+
+# Temporary documentation patch
+README_editor_changes.patch
