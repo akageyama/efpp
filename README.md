@@ -1,64 +1,107 @@
-# efpp
-efpp: A preprocessor for eFortran, a dialect of the modern Fortran
+# eFortran / efpp
 
-## Usage
+**A lightweight, readability-oriented dialect of Modern Fortran for scientific simulation codes.**
 
-An eFortran source file has the extension `.ef`. The `efpp.py` preprocessor converts it into a standard Fortran source file with the extension `.F90`.
+[eFortran](https://github.com/akageyama/efpp) adds a small set of conveniences to ordinary Fortran: dot notation for derived-type components, compound assignments, shorter declaration attributes, and a few useful block constructs. **efpp** is a Python preprocessor that translates an eFortran source file (`.ef`) into standard Fortran source (`.F90`). The resulting file is compiled by your usual Fortran compiler.
 
-For example:
+eFortran is **not a new compiler**. It is a thin preprocessing layer intended for scientific and numerical software, where readable source code and compatibility with existing Fortran tools are important. In particular, efpp aims to keep source line numbers aligned between `.ef` and `.F90` files, making compiler diagnostics easier to trace.
 
-```bash
-./efpp.py sample.ef > sample.F90
+## At a glance
+
+| eFortran | Generated Fortran | Purpose |
+| --- | --- | --- |
+| `call field.advance(time.dt)` | `call field%advance(time%dt)` | Component access with `.` |
+| `x += dx` | `x = x + dx` | Compound assignment |
+| `real(DR) <in> :: dt` | `real(DR), intent(in) :: dt` | Short declaration attributes |
+| `if <just_once>` | `if (just_once) then` | One-time block (with a closing action) |
+| `if <skip counter:8>` | `if (mod(counter,8)==0) then` | Execute every eighth encounter (with a closing action) |
+
+The last two rows show **opening lines only**. Their closing `end if` lines also generate code, as explained below.
+
+## Getting started
+
+### Requirements
+
+- **Python 3** to run `efpp.py` (no third-party Python packages are required by the script).
+- A **Fortran compiler**, such as `gfortran`, to compile the generated `.F90` files.
+- **GNU Make** only if you want to use the included Makefile-based example.
+
+Clone the repository:
+
+```sh
+git clone https://github.com/akageyama/efpp.git
+cd efpp
 ```
 
-The generated `sample.F90` can be compiled with a standard Fortran compiler, such as `gfortran`.
+Try the included sample program:
 
-### Using efpp with Make
-
-For projects using GNU Make, the following rule converts `.ef` files into `.F90` files:
-
-```makefile
-EFPP = ../efpp.py
-
-%.F90: %.ef
-	@rm -f $@.tmp
-	@$(EFPP) $< > $@.tmp || { rm -f $@.tmp; exit 1; }
-	@mv -f $@.tmp $@
+```sh
+cd sample_code
+make
 ```
 
-The preprocessor first writes to a temporary file. Only after successful conversion is the temporary file renamed to the target `.F90` file.
+The sample Makefile converts the `.ef` files, compiles them with `gfortran`, and runs the resulting program. Its conversion rule preserves an existing `.F90` file if preprocessing fails.
 
-If preprocessing fails, the temporary file is removed and any existing `.F90` file is preserved.
+### A small example
 
-The path to `efpp.py` should be adjusted to match the project directory structure. The command lines in the Makefile rule must begin with a TAB character.
+Save the following as `demo.ef` in a working directory:
 
-A working example is provided in [`sample_code/Makefile`](sample_code/Makefile).
+```fortran
+program demo
+  implicit none
+  logical :: just_once = .true.
+  integer :: counter = 0
+  integer :: i, samples = 0
 
+  do i = 1, 5
+    if <just_once>
+      print *, "Starting simulation"
+    end if
 
-## Functions
+    if <skip counter:2>
+      samples += 1
+    end if
+  end do
 
+  print *, "Samples:", samples
+end program demo
+```
 
-### Member access with `.`
+From that working directory, run efpp (adjust the path to `efpp.py` to match your installation):
 
-In eFortran, a dot (`.`) can be used instead of the standard Fortran component selector `%` for derived types:
+```sh
+python3 /path/to/efpp/efpp.py demo.ef > demo.F90
+gfortran -o demo demo.F90
+./demo
+```
+
+The program prints `Starting simulation` once and reports **3 samples**: the `skip` body runs when `counter` is 0, 2, and 4. The counter is incremented after each encounter with the block.
+
+**No alias file is required for this example.** If `efpp_alias.list` exists in the current working directory, efpp loads it automatically; otherwise, it uses its built-in substitutions alone.
+
+## Language features
+
+### Dot notation for components
+
+Use `.` instead of `%` when accessing derived-type components:
 
 ```fortran
 call field.advance(time.dt)
+a(i).value += dt
 ```
 
-This becomes:
+This is converted to:
 
 ```fortran
 call field%advance(time%dt)
+a(i)%value = a(i)%value + dt
 ```
 
-Numeric decimal points, quoted strings, comments, and recognized dot operators (such as `.and.`) are not converted. In ordinary expressions, write user-defined dot operators with spaces, as in `a .cross. b`, to distinguish them from component access.
+Decimal points, quoted strings, comments, intrinsic dot operators (such as `.and.`), and recognized user-defined operators are protected. In ordinary expressions, **surround user-defined dot operators with spaces**, for example `a .cross. b`, to avoid ambiguity with member access. This is a lightweight transformation, not full Fortran parsing.
 
 ### Shorter declarations
 
-The following eFortran annotations are expanded into standard Fortran declaration attributes:
-
-| eFortran annotation | Fortran attribute(s) |
+| eFortran | Fortran declaration attribute(s) |
 | --- | --- |
 | `<in>` | `intent(in)` |
 | `<out>` | `intent(out)` |
@@ -71,151 +114,223 @@ The following eFortran annotations are expanded into standard Fortran declaratio
 For example:
 
 ```fortran
-integer(SI) <in> :: i, j, k
-real(DR) <optin> :: pi
+real(DR) <in> :: dt
+integer <optout> :: status
 ```
 
-The current implementation performs text substitutions for these annotations and expects spaces around the annotation tokens.
+These annotations are implemented as text substitutions; **include spaces around the tokens** as shown.
 
-### "Just once" block
+### Compound assignments
 
-A `just_once` block is executed while the logical variable `just_once` is true. Its closing marker sets that variable to false.
+`+=`, `-=`, and `*=` expand into standard assignments:
 
 ```fortran
-program test
-  implicit none
-  logical :: just_once = .true.
-
-  ==<just_once>==
-    print *, "Executed only once"
-  ==</just_once>==
-end program test
+x += dt
+energy -= loss
+a(i) *= factor
+if (x > 0) a(i) += b
 ```
 
-The program must declare and initialize `just_once` itself. The preprocessor translates the opening and closing markers to an `if (just_once) then` block and `just_once = .false. ; end if`, respectively.
+The preprocessor also supports array subscripts containing spaces and multiple semicolon-separated statements on one line. It does **not** reinterpret Fortran's `/=` inequality operator.
 
-### "Skip" block
+Because the left-hand side is duplicated in the generated code, avoid expressions with side effects on the left, such as `a(next_index()) += 1`: the function could be evaluated twice.
 
-A `skip` block executes its body when `mod(counter, interval) == 0`, and increments the named counter at the closing marker.
+### One-time blocks: `just_once`
+
+The recommended syntax is:
 
 ```fortran
-program test
-  implicit none
-  integer :: ctr = 0, i
+logical :: just_once = .true.
 
-  do i = 1, 200
-    ===<skip ctr:8>===
-      print *, i
-    ===</skip ctr>===
-  end do
-end program test
+if <just_once>
+  call initialize()
+end if
 ```
 
-In this example, the body runs when `ctr` is a multiple of 8. The counter must be declared and initialized by the program.
+The block is converted to an ordinary `if (just_once) then` block. Its closing line sets `just_once = .false.` before ending the conditional. **You must declare and initialize the logical variable `just_once` yourself.** Once the block has executed, subsequent encounters skip its body unless your program sets the variable to true again.
 
-### Predefined macros
+For compatibility, the original syntax is also supported:
 
-The preprocessor recognizes the following source-location and routine-name macros:
+```fortran
+==<just_once>==
+  call initialize()
+==</just_once>==
+```
+
+Both forms retain line-number correspondence. Nested `just_once` blocks are not allowed; the unified block parser checks this and reports mismatched markers.
+
+### Periodic blocks: `skip`
+
+The recommended syntax is:
+
+```fortran
+integer :: counter = 0
+
+if <skip counter:8>
+  call write_output()
+end if
+```
+
+This is equivalent to:
+
+```fortran
+if (mod(counter,8)==0) then
+  call write_output()
+end if; counter = counter + 1
+```
+
+The body executes when the counter is divisible by 8. **The counter is declared and initialized by your program**, not by efpp. The counter increments at the end of the block, whether or not the body executed. The starting value therefore matters: starting at 0 executes the body on the first encounter. Control transfers that bypass the closing increment can change this behavior.
+
+The original syntax remains supported:
+
+```fortran
+===<skip counter:8>===
+  call write_output()
+===</skip counter>===
+```
+
+The current unified parser tracks `skip`, `just_once`, and ordinary block `if` statements together to match closing lines, including nested blocks. The old forms are maintained for existing code.
+
+### Predefined source-location macros
 
 | Macro | Replacement |
 | --- | --- |
 | `__MODULE__` | Outermost recognized program or module name |
-| `__FUNC__` | Recognized subprogram name (or nested subprogram path) |
-| `__MODFUNC__` | Program/module name followed by subprogram path |
+| `__FUNC__` | Recognized subprogram name or nested subprogram path |
+| `__MODFUNC__` | Program/module name followed by the subprogram path |
 | `__LINE__` | Source line number |
-| `__MODLINE__` | Program/module name followed by the source line number in parentheses |
+| `__MODLINE__` | Program/module name with line number in parentheses |
 
-These replacements can also be used inside string literals. Name-based macros depend on the program and subprogram declarations recognized by the current lightweight parser.
+These macros also expand inside strings, making them useful for diagnostics. Name recognition uses a lightweight parser and does not cover every possible Fortran declaration form.
 
 ### User-defined aliases
 
-User-defined text substitutions are specified in `efpp_alias.list` (or in an alias file passed as the second command-line argument):
+User-defined aliases are optional. By default, efpp reads `efpp_alias.list` from the current working directory **if the file exists**. If it does not exist, preprocessing continues using built-in substitutions alone. You can also explicitly specify an alias file as the second command-line argument:
+
+```sh
+python3 /path/to/efpp/efpp.py demo.ef custom_alias.list > demo.F90
+```
+
+An explicitly specified alias file **must exist**; otherwise, efpp reports an error. Likewise, an existing alias file with invalid definitions produces an error.
+
+Alias definitions use the following format:
 
 ```text
 "do i bulk" => "do i = 1, NXPP"
-"__EFPPVER__" => "180802"
+"__VERSION__" => "2026"
 ```
 
-A definition can also span multiple lines, as described by the examples in `efpp.py`. The replacement is textual and follows definition order; replacement text may itself match a later alias. Duplicate aliases, unrecognized definition syntax, and incomplete definitions at the end of the file are reported as errors.
-
-### `implicit none` check
-
-The preprocessor performs a simple check for `implicit none` near the beginning of a recognized `program` or `module`. This is not a full Fortran syntax check and does not independently validate every program unit.
-
-### Compound assignment operators
-
-The preprocessor expands `+=`, `-=`, and `*=` into ordinary Fortran assignments:
-
-```fortran
-x += y                 ! x = x + y
-x -= y                 ! x = x - y
-x *= 2                 ! x = x * 2
-if (x > 0) a(i) += b   ! if (x > 0) a(i) = a(i) + b
-```
-
-It also supports component and array references (including spaces inside subscripts) and multiple statements separated by semicolons. Text inside strings and comments is preserved.
-
-The Fortran inequality operator `/=` is **not** treated as a compound assignment. Because a compound assignment duplicates the left-hand side in the generated code, avoid side-effecting expressions such as `a(next_index()) += 1`.
+Definitions may span multiple lines. Aliases are applied as **ordered text replacements**; a replacement can itself match a later alias. Thus, order can affect the result. Duplicate aliases, unrecognized definitions, and incomplete definitions at end-of-file cause errors. Alias replacement is textual rather than token-aware, so choose distinctive patterns.
 
 ### Block comments
 
-eFortran supports block comments delimited by `!!>` and `!!<`.
-
-For example:
+Use `!!>` to begin and `!!<` to end a block comment:
 
 ```fortran
-program test
-  implicit none
-
-  print *, "Before"
-
-  !!>
-  print *, "This line is commented out."
-  print *, "This line is also commented out."
-  !!<
-
-  print *, "After"
-end program test
+!!>
+call temporarily_disabled()
+!!<
 ```
 
-The preprocessor comments out lines between `!!>` and `!!<` by inserting `!` at the beginning of each line.
+The preprocessor comments out the enclosed lines without changing the number of lines. Block comments can be nested.
 
-Block comments can also be nested. Each additional nesting level adds another `!` to the beginning of the affected lines.
+### Other conveniences
 
-The original number of lines is preserved, so source line numbers remain unchanged.
+**Subsidiary calls:** `-call` lets you append a procedure call to an existing source line:
 
-### Subsidiary call
-
-```
-       xyz -call abc()  =>  xyz ;call abc()
-           -call abc()  =>       call abc()
+```text
+statement -call update()   ->  statement ;call update()
+           -call update()   ->  call update()
 ```
 
-This could be convenient for test or timer routine calls.
+This is useful for instrumentation; the repository also contains specialized clock annotations.
 
+**`implicit none` check:** efpp performs a simple check near the start of recognized programs or modules. It is **not** a complete syntax check of every Fortran program unit.
 
-## Using Vim quickfix with eFortran
+## Using efpp with GNU Make
 
-When efpp converts an `.ef` file to `.F90`, it preserves the number and order of source lines. This makes it possible to use Vim's quickfix feature to jump from compiler diagnostics for generated `.F90` files to the corresponding `.ef` source lines.
+For applications with multiple `.ef` source files, use a pattern rule such as:
 
-For example, suppose `sample.F90` was generated from `sample.ef`. After compiling with `:make`, the quickfix list may contain references to `sample.F90`. Those filenames can be changed to `sample.ef` without changing the line numbers.
+```makefile
+EFPP = ../efpp.py
 
-The following optional mapping can be added to your `.vimrc`:
+%.F90: %.ef
+	@rm -f $@.tmp
+	@$(EFPP) $< > $@.tmp || { rm -f $@.tmp; exit 1; }
+	@mv -f $@.tmp $@
+```
+
+Set `EFPP` to the correct script path. An alias file is **not required**: if `efpp_alias.list` exists in the working directory, efpp reads it automatically; otherwise, it runs without user-defined aliases. To require a particular alias file, pass its path as the second argument to efpp in the Makefile rule. Recipe lines must start with a **TAB**. This rule writes the generated Fortran to a temporary file and only replaces the target on successful conversion; on failure, it removes the temporary file and preserves any pre-existing `.F90` file. See [`sample_code/Makefile`](sample_code/Makefile) for a complete example.
+
+## Tests
+
+Run the Python unit tests from the repository root:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+The tests cover member access, compound assignments, lexical masking, CLI errors (including optional and explicitly specified alias files), and the old and new special-block syntaxes. An additional Fortran program at [`tests/test_blocks.ef`](tests/test_blocks.ef) checks the runtime behavior of `just_once` and `skip` after preprocessing and compilation.
+
+These tests and the sample program are useful regression checks, but they do not establish support for every legal Fortran construct.
+
+## Limitations and compatibility
+
+- efpp is a **lightweight source-to-source preprocessor**, not a complete Fortran lexer or parser. Unusual continuation lines, complex nested syntax, and ambiguous user-defined dot operators may need care.
+- The new `if <just_once>` and `if <skip counter:8>` spellings are preferred. The older marker-based spellings remain supported for existing programs.
+- The special-block parser tracks a useful subset of Fortran block-`if` syntax. It is not a substitute for compiler syntax checking.
+- Most transformations preserve the number and order of source lines. This is useful for diagnostics, but efpp does not produce formal source maps.
+- Output is intended for an ordinary Fortran compiler. Any compiler errors in the generated code still need to be resolved in the source or in the corresponding preprocessing rule.
+
+## Editor integration
+
+### Visual Studio Code (recommended starting point)
+
+[Visual Studio Code](https://code.visualstudio.com/) is an optional editor for eFortran; efpp itself does not depend on any editor. Install the [Modern Fortran extension](https://github.com/fortran-lang/vscode-fortran-support) (publisher `fortran-lang`) for Fortran syntax coloring. Associate the eFortran extension `.ef` with free-form Fortran by adding this to your workspace's `.vscode/settings.json`:
+
+```json
+{
+  "files.associations": {
+    "*.ef": "FortranFreeForm"
+  }
+}
+```
+
+The exact example is provided in [`examples/vscode/settings.json`](examples/vscode/settings.json). You may also install `fortls` for ordinary Fortran language-server features, but **eFortran-specific syntax is not understood by standard Fortran language servers**. They may therefore flag valid eFortran extensions before preprocessing; compiler results from generated `.F90` files remain the authoritative check.
+
+Open the repository as a VS Code folder. Use the integrated terminal to build the sample, exactly as you would outside the editor:
+
+```sh
+cd sample_code
+make
+```
+
+#### Jumping from gfortran errors to `.ef` source
+
+The Fortran compiler sees generated `.F90` filenames. VS Code's `problemMatcher` extracts filenames and line numbers from diagnostic text, but **does not itself rename `.F90` paths to `.ef`**. For GNU Fortran, an optional helper is included at [`tools/vscode_make.py`](tools/vscode_make.py), together with a sample [VS Code task](examples/vscode/tasks.json). It relays the original build output, and when gfortran reports an error for `name.F90` and `name.ef` exists alongside it, it emits an additional single-line diagnostic referring to `name.ef`. It also propagates the build's exit code.
+
+For the **included sample**, copy the example settings and task definitions into the repository root's `.vscode/` directory:
+
+```sh
+mkdir -p .vscode
+cp examples/vscode/settings.json .vscode/settings.json
+cp examples/vscode/tasks.json .vscode/tasks.json
+```
+
+Then, in VS Code, select **Terminal → Run Build Task** (or the default build-task shortcut). The task runs `make` in `sample_code`; matching gfortran diagnostics can appear in the Problems panel and point to the corresponding `.ef` file. To check the mapping, intentionally introduce a syntax error into a copy of a sample `.ef` file, rebuild, then restore the file.
+
+For your own project, adapt `tasks.json`: set `options.cwd` to the directory used for `make`, point `args[0]` to `vscode_make.py`, and set `problemMatcher.fileLocation` to that same source directory. The helper currently recognizes a common **gfortran multiline diagnostic format**; it is not a general diagnostic parser for all Fortran compilers or all error messages. Line navigation assumes that preprocessing preserves the relevant source line numbers.
+
+### Vim quickfix (optional)
+
+Because efpp preserves line-number correspondence, compiler error locations referring to generated `.F90` files can often be mapped back to the corresponding `.ef` files. For users of Vim's quickfix, this optional `.vimrc` mapping changes `.F90` references in a quickfix list to `.ef`:
 
 ```vim
 nnoremap <silent> Y :copen<CR>:setlocal modifiable<CR>:%s/\.F90\>/.ef/g<CR>:call histdel('/', -1)<CR>:cbuffer<CR>:cclose<CR>
 ```
 
-Use it as follows:
-
-1. Run `:make` in Vim to compile the program and populate the quickfix list.
-2. If the list contains compiler errors referring to generated `.F90` files, press `Y` to replace those filename extensions with `.ef`.
-3. Use `:cnext`, `:cprev`, or `:copen` to navigate the errors in the original eFortran files.
-
-The pattern `\.F90\>` matches a literal `.F90` extension rather than an arbitrary character followed by `F90`. This mapping assumes that `.F90` filenames in the quickfix list correspond to `.ef` source files with the same base names. It is not a general-purpose source-map mechanism, and it does not address transformations that change the line numbering.
-
-**Note:** This mapping overrides Vim's normal-mode `Y` command. Choose a different key if you already use `Y` for another purpose.
+Run `:make` in Vim, use `Y` if needed to rewrite the quickfix filenames, and navigate with `:cnext` or `:cprev`. This assumes matching file base names. It overrides the normal-mode `Y` key and is not a general source-map mechanism.
 
 ## Reference
 
-S. Hosoyamada and A. Kageyama, "A Dialect of Modern Fortran for Simulations" in Methods and Applications for Modeling and Simulation of Complex Systems, Communications in Computer and Information Science, vol 946, pages 439-448, 2018 (Proceedings of AsiaSim2018)
+S. Hosoyamada and A. Kageyama, “A Dialect of Modern Fortran for Simulations,” in *Methods and Applications for Modeling and Simulation of Complex Systems*, Communications in Computer and Information Science, vol. 946, pp. 439–448 (2018), Proceedings of AsiaSim 2018.

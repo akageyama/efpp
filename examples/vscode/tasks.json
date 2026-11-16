@@ -1,0 +1,33 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build eFortran sample (gfortran)",
+      "type": "process",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/tools/vscode_make.py",
+        "make"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/sample_code"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": {
+        "owner": "fortran",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.+\\.ef):([0-9]+):([0-9]+): (error|warning): (.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    }
+  ]
+}
