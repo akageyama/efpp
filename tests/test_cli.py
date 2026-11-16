@@ -144,5 +144,58 @@ class TestCLI(unittest.TestCase):
             self.assertEqual(result.stdout, "")
             self.assertIn("duplicate", result.stderr.lower())
 
+    def test_no_default_alias_file(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "test.ef"
+            source.write_text(
+                "program test\n"
+                "  implicit none\n"
+                "  integer :: x\n"
+                "  x += 1\n"
+                "end program test\n"
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(EFPP), str(source)],
+                cwd=tmp,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stderr, "")
+            self.assertIn("x = x + 1", result.stdout)
+
+    def test_existing_default_alias_file(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "test.ef"
+            source.write_text(
+                "program test\n"
+                "  implicit none\n"
+                "  integer :: x\n"
+                "  x = MY_CONSTANT\n"
+                "end program test\n"
+            )
+
+            alias = Path(tmp) / "efpp_alias.list"
+            alias.write_text(
+                '"MY_CONSTANT" => "12345"\n'
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(EFPP), str(source)],
+                cwd=tmp,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(result.stderr, "")
+            self.assertIn("x = 12345", result.stdout)
+
 if __name__ == "__main__":
     unittest.main()

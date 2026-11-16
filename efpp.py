@@ -444,8 +444,9 @@ def alias_decode(alias_list, lines_in):
           : ", parameter "
         }
 
-    # Append user-defined macros
-    alias_dict.update(read_alias_list_and_make_dict(alias_list))
+    # Append user-defined macros only when an alias file is selected.
+    if alias_list is not None:
+        alias_dict.update(read_alias_list_and_make_dict(alias_list))
 
     output = list()
     for line in lines_in:
@@ -1397,15 +1398,21 @@ def efpp(filename_in, alias_list):
 
 if __name__ == '__main__':
 
-    if len(sys.argv)==1:
+    if len(sys.argv) == 1:
         filename_in = input('enter filename_in name > ')
-        filename_alias_list = 'efpp_alias.list'
-    elif len(sys.argv)==2:
-        filename_in = sys.argv[1]
-        filename_alias_list = 'efpp_alias.list'
     else:
         filename_in = sys.argv[1]
+
+    if len(sys.argv) >= 3:
+        # An explicitly specified alias file must exist.
         filename_alias_list = sys.argv[2]
+    else:
+        # The default alias file is optional (relative to the working directory).
+        import os
+        default_alias = 'efpp_alias.list'
+        filename_alias_list = (
+            default_alias if os.path.isfile(default_alias) else None
+        )
 
     try:
         efpp(filename_in, filename_alias_list)
