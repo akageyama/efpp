@@ -50,21 +50,23 @@ Save the following as `demo.ef` in a working directory:
 ```fortran
 program demo
   implicit none
+  type :: simulation_state
+    integer :: step = 0
+    real :: energy = 1.0
+  end type simulation_state
+  type(simulation_state) :: state
   logical :: just_once = .true.
-  integer :: counter = 0
-  integer :: i, samples = 0
+  integer :: i
 
   do i = 1, 5
     if <just_once>
       print *, "Starting simulation"
     end if
-
-    if <skip counter:2>
-      samples += 1
-    end if
+    state.step += 1
+    state.energy *= 0.5
   end do
 
-  !debugp samples
+  !debugp state.step, state.energy
 end program demo
 ```
 
@@ -76,7 +78,7 @@ gfortran -o demo demo.F90
 ./demo
 ```
 
-The program prints `Starting simulation` once. The `!debugp` statement then displays `samples = 3`, together with the program name and source line number. The `skip` body runs when `counter` is 0, 2, and 4; the counter increments after every encounter with the block.
+The program prints `Starting simulation` once, then updates the components of `state` using dot notation and compound assignments. The `!debugp` statement displays `state.step = 5` and `state.energy = 0.03125`, together with the program name and source line number. efpp converts component access (`.`) to standard Fortran (`%`).
 
 **No alias file is required for this example.** If `efpp_alias.list` exists in the current working directory, efpp loads it automatically; otherwise, it uses its built-in substitutions alone.
 
