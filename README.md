@@ -12,12 +12,12 @@ eFortran is **not a new compiler**. It is a thin preprocessing layer intended fo
 | --- | --- | --- |
 | `call field.advance(time.dt)` | `call field%advance(time%dt)` | Component access with `.` |
 | `x += dx` | `x = x + dx` | Compound assignment |
-| `!debugp energy` | `print *, ...` | Print a labeled value with source location |
+| `!debugp i` | `print *, 'i = ', i` | Print a labeled value with source location |
 | `real(DR) <in> :: dt` | `real(DR), intent(in) :: dt` | Short declaration attributes |
 | `if <just_once>` | `if (just_once) then` | One-time block (with a closing action) |
 | `if <skip counter:8>` | `if (mod(counter,8)==0) then` | Execute every eighth encounter (with a closing action) |
 
-The last two rows show **opening lines only**. Their closing `end if` lines also generate code, as explained below.
+The `!debugp` translation shown above is schematic: efpp also includes the source location in the generated output. The last two rows show **opening lines only**. Their closing `end if` lines also generate code, as explained below.
 
 ## Getting started
 
