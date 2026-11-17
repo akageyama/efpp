@@ -64,7 +64,7 @@ program demo
     end if
   end do
 
-  print *, "Samples:", samples
+  !debugp samples
 end program demo
 ```
 
@@ -76,7 +76,7 @@ gfortran -o demo demo.F90
 ./demo
 ```
 
-The program prints `Starting simulation` once and reports **3 samples**: the `skip` body runs when `counter` is 0, 2, and 4. The counter is incremented after each encounter with the block.
+The program prints `Starting simulation` once. The `!debugp` statement then displays `samples = 3`, together with the program name and source line number. The `skip` body runs when `counter` is 0, 2, and 4; the counter increments after every encounter with the block.
 
 **No alias file is required for this example.** If `efpp_alias.list` exists in the current working directory, efpp loads it automatically; otherwise, it uses its built-in substitutions alone.
 
