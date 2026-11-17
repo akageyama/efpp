@@ -12,6 +12,7 @@ eFortran is **not a new compiler**. It is a thin preprocessing layer intended fo
 | --- | --- | --- |
 | `call field.advance(time.dt)` | `call field%advance(time%dt)` | Component access with `.` |
 | `x += dx` | `x = x + dx` | Compound assignment |
+| `!debugp energy` | `print *, ...` | Print a labeled value with source location |
 | `real(DR) <in> :: dt` | `real(DR), intent(in) :: dt` | Short declaration attributes |
 | `if <just_once>` | `if (just_once) then` | One-time block (with a closing action) |
 | `if <skip counter:8>` | `if (mod(counter,8)==0) then` | Execute every eighth encounter (with a closing action) |
@@ -191,6 +192,32 @@ The original syntax remains supported:
 
 The current unified parser tracks `skip`, `just_once`, and ordinary block `if` statements together to match closing lines, including nested blocks. The old forms are maintained for existing code.
 
+### Debug printing: `!debugp`
+
+`!debugp` is a convenient way to insert diagnostic output without manually writing a `print` statement. It automatically includes the program/module name and source line number, and labels expressions with their names.
+
+For example:
+
+```fortran
+integer :: step = 3
+real :: energy = 0.125
+
+!debugp "state", step, energy
+step += 1  !debugp step
+```
+
+The first `!debugp` generates a `print *` statement reporting `state`, `step = 3`, and `energy = 0.125`, prefixed with the source location (such as `\my_program(5):`). The second appends a debug print to the same line as the assignment and reports the **updated** value of `step`.
+
+You can use `!debugp` with a single variable, a quoted message, or a comma-separated combination of messages and values:
+
+```fortran
+!debugp temperature
+!debugp "checkpoint reached"
+!debugp "iteration", n, "residual", residual
+```
+
+The marker resembles a Fortran comment but is converted into executable output by efpp. Remove it or change it to a normal comment when you no longer want the diagnostic print. Argument splitting is lightweight rather than full Fortran parsing, so expressions with embedded commas (for example, array sections or calls with multiple arguments) may need care.
+
 ### Predefined source-location macros
 
 | Macro | Replacement |
@@ -279,7 +306,7 @@ These tests and the sample program are useful regression checks, but they do not
 - efpp is a **lightweight source-to-source preprocessor**, not a complete Fortran lexer or parser. Unusual continuation lines, complex nested syntax, and ambiguous user-defined dot operators may need care.
 - The new `if <just_once>` and `if <skip counter:8>` spellings are preferred. The older marker-based spellings remain supported for existing programs.
 - The special-block parser tracks a useful subset of Fortran block-`if` syntax. It is not a substitute for compiler syntax checking.
-- Most transformations preserve the number and order of source lines. This is useful for diagnostics, but efpp does not produce formal source maps.
+- Most transformations (including `!debugp`) preserve the number and order of source lines. This is useful for diagnostics, but efpp does not produce formal source maps.
 - Output is intended for an ordinary Fortran compiler. Any compiler errors in the generated code still need to be resolved in the source or in the corresponding preprocessing rule.
 
 ## Editor integration
