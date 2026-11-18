@@ -14,10 +14,10 @@ eFortran is **not a new compiler**. It is a thin preprocessing layer intended fo
 | `x += dx` | `x = x + dx` | Compound assignment |
 | `!debugp i` | `print *, 'i = ', i` | Print a labeled value with source location |
 | `real(DR) <in> :: dt` | `real(DR), intent(in) :: dt` | Short declaration attributes |
-| `if <just_once>` | `if (just_once) then` | One-time block (with a closing action) |
+| `do <just_once>` | `if (just_once) then` | One-time block (with a closing action) |
 | `if <skip counter:8>` | `if (mod(counter,8)==0) then` | Execute every eighth encounter (with a closing action) |
 
-The `!debugp` translation shown above is schematic: efpp also includes the source location in the generated output. The last two rows show **opening lines only**. Their closing `end if` lines also generate code, as explained below.
+The `!debugp` translation shown above is schematic: efpp also includes the source location in the generated output. The last two rows show **opening lines only**. Their closing lines (`end do` for `just_once`, `end if` for `skip`) also generate code, as explained below.
 
 ## Getting started
 
@@ -59,9 +59,9 @@ program demo
   integer :: i
 
   do i = 1, 5
-    if <just_once>
+    do <just_once>
       print *, "Starting simulation"
-    end if
+    end do
     state.step += 1
     state.energy *= 0.5
   end do
@@ -145,9 +145,9 @@ The recommended syntax is:
 ```fortran
 logical :: just_once = .true.
 
-if <just_once>
+do <just_once>
   call initialize()
-end if
+end do
 ```
 
 The block is converted to an ordinary `if (just_once) then` block. Its closing line sets `just_once = .false.` before ending the conditional. **You must declare and initialize the logical variable `just_once` yourself.** Once the block has executed, subsequent encounters skip its body unless your program sets the variable to true again.
@@ -160,7 +160,7 @@ For compatibility, the original syntax is also supported:
 ==</just_once>==
 ```
 
-Both forms retain line-number correspondence. Nested `just_once` blocks are not allowed; the unified block parser checks this and reports mismatched markers.
+Both forms retain line-number correspondence. The previous `if <just_once>` spelling is no longer supported. Nested `just_once` blocks are not allowed; the unified block parser checks this and reports mismatched markers.
 
 ### Periodic blocks: `skip`
 
@@ -192,7 +192,7 @@ The original syntax remains supported:
 ===</skip counter>===
 ```
 
-The current unified parser tracks `skip`, `just_once`, and ordinary block `if` statements together to match closing lines, including nested blocks. The old forms are maintained for existing code.
+The current unified parser tracks `skip`, `just_once`, and ordinary block `if` and `do` statements together to match closing lines, including nested blocks. The old forms are maintained for existing code.
 
 ### Debug printing: `!debugp`
 
@@ -306,7 +306,7 @@ These tests and the sample program are useful regression checks, but they do not
 ## Limitations and compatibility
 
 - efpp is a **lightweight source-to-source preprocessor**, not a complete Fortran lexer or parser. Unusual continuation lines, complex nested syntax, and ambiguous user-defined dot operators may need care.
-- The new `if <just_once>` and `if <skip counter:8>` spellings are preferred. The older marker-based spellings remain supported for existing programs.
+- The new `do <just_once>` and `if <skip counter:8>` spellings are preferred. The older marker-based spellings remain supported for existing programs.
 - The special-block parser tracks a useful subset of Fortran block-`if` syntax. It is not a substitute for compiler syntax checking.
 - Most transformations (including `!debugp`) preserve the number and order of source lines. This is useful for diagnostics, but efpp does not produce formal source maps.
 - Output is intended for an ordinary Fortran compiler. Any compiler errors in the generated code still need to be resolved in the source or in the corresponding preprocessing rule.

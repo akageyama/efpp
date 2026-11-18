@@ -487,15 +487,16 @@ def subsdiary_call_decode(lines_in):
 #=============================================
 def special_block_decode(lines_in):
 #=============================================
-    """Translate IF-style and legacy just_once/skip blocks with one stack.
+    """Translate DO-style just_once, IF-style skip, and legacy blocks.
 
-    Old spellings and their historical output formatting are preserved.
-    Every source line produces exactly one output line. A normal Fortran
-    block IF is tracked only to locate the end of a special IF block.
+    Old marker spellings and their historical output formatting are preserved.
+    Every source line produces exactly one output line. Ordinary Fortran IF
+    and DO blocks are tracked to match special block terminators.
     """
     output = []
     # (kind, counter, source_line); counter is used only for skip blocks.
     stack = []
+    pending_if = None  # Continued ordinary IF statement, not yet completed.
 
     legacy_once_begin = re.compile(r'^([^=]+)=+<just_once>=+(.*)$')
     legacy_once_end = re.compile(r'^([^=]+)=+</just_once>=+(.*)$')
@@ -506,7 +507,7 @@ def special_block_decode(lines_in):
         r'^([^=]+)=+</skip\s+([a-zA-Z][a-zA-Z_0-9]*)>=+(.*)$'
     )
     new_once_begin = re.compile(
-        r'^(\s*)if\s*<just_once>\s*$', re.IGNORECASE
+        r'^(\s*)do\s*<just_once>\s*$', re.IGNORECASE
     )
     new_skip_begin = re.compile(
         r'^(\s*)if\s*<skip\s+([A-Za-z][A-Za-z_0-9]*)\s*:\s*([^>\r\n]+?)\s*>\s*$',
@@ -518,6 +519,18 @@ def special_block_decode(lines_in):
     )
     ordinary_if_end = re.compile(
         r'^\s*(?:end\s*if|endif)(?:\s+[A-Za-z]\w*)?\s*$',
+        re.IGNORECASE,
+    )
+    obsolete_once_begin = re.compile(
+        r'^\s*if\s*<just_once>\s*$', re.IGNORECASE
+    )
+    # Recognize ordinary block DO, including named DO and DO WHILE/CONCURRENT.
+    ordinary_do_begin = re.compile(
+        r'^\s*(?:[A-Za-z]\w*\s*:\s*)?do(?=\s|$)(?!\s*<)',
+        re.IGNORECASE,
+    )
+    ordinary_do_end = re.compile(
+        r'^\s*(?:end\s*do|enddo)(?:\s+[A-Za-z]\w*)?\s*$',
         re.IGNORECASE,
     )
 
@@ -574,6 +587,36 @@ def special_block_decode(lines_in):
         if newline and comment.endswith(newline):
             comment = comment[:-len(newline)]
 
+        # A normal Fortran block IF may span continuation lines, e.g.
+        #   if (a > 0 .or. &
+        #       b > 0) then
+        # Track the complete statement before classifying it as a block IF.
+        # Preserve the original lines unchanged.
+        if pending_if is not None:
+            piece = code.strip()
+            if piece and not piece.startswith('!'):
+                piece = piece.lstrip('&').strip()
+                continued = piece.endswith('&')
+                pending_if += ' ' + piece.rstrip('&').rstrip()
+                if not continued:
+                    if ordinary_if_begin.match(pending_if):
+                        stack.append(('if', None, lineno))
+                    pending_if = None
+            output.append(line)
+            continue
+
+        if re.match(r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(', code,
+                    re.IGNORECASE) and code.endswith('&'):
+            pending_if = code[:-1].rstrip()
+            output.append(line)
+            continue
+
+        if obsolete_once_begin.match(code):
+            raise ValueError(
+                f'Unsupported if <just_once> at line {lineno}: '
+                'use do <just_once> ... end do'
+            )
+
         m = new_once_begin.match(code)
         if m:
             reject_nested_just_once()
@@ -596,20 +639,38 @@ def special_block_decode(lines_in):
             output.append(line)
             continue
 
-        if ordinary_if_end.match(code):
+        if ordinary_do_begin.match(code):
+            stack.append(('do', None, lineno))
+            output.append(line)
+            continue
+
+        if ordinary_do_end.match(code):
             if not stack:
                 output.append(line)  # Leave ordinary Fortran errors to compiler.
                 continue
-            kind, counter, _ = stack[-1]
-            if kind.startswith('legacy_'):
-                raise ValueError(f'Mismatched end if at line {lineno}: '
-                                 f'legacy {kind} needs its legacy end marker')
+            kind, _, _ = stack[-1]
+            if kind in ('if', 'skip', 'legacy_just_once', 'legacy_skip'):
+                raise ValueError(f'Mismatched end do at line {lineno}')
             stack.pop()
             indent = re.match(r'^\s*', code).group()
             if kind == 'just_once':
                 output.append(indent + 'just_once = .false. ; end if'
                               + trailing + comment + newline)
-            elif kind == 'skip':
+            else:
+                output.append(line)
+            continue
+
+        if ordinary_if_end.match(code):
+            if not stack:
+                output.append(line)  # Leave ordinary Fortran errors to compiler.
+                continue
+            kind, counter, _ = stack[-1]
+            if kind != 'if' and kind != 'skip':
+                raise ValueError(f'Mismatched end if at line {lineno}: '
+                                 f'cannot close {kind} block')
+            stack.pop()
+            indent = re.match(r'^\s*', code).group()
+            if kind == 'skip':
                 output.append(indent + 'end if; ' + counter + ' = '
                               + counter + ' + 1'
                               + trailing + comment + newline)
@@ -619,7 +680,7 @@ def special_block_decode(lines_in):
 
         output.append(line)
 
-    special_unclosed = [item for item in stack if item[0] != 'if']
+    special_unclosed = [item for item in stack if item[0] not in ('if', 'do')]
     if special_unclosed:
         kind, _, lineno = special_unclosed[-1]
         raise ValueError(f'Unclosed {kind} block starting at line {lineno}')
@@ -629,124 +690,12 @@ def special_block_decode(lines_in):
 #=============================================
 def just_once_region(lines_in):
 #=============================================
+    """Compatibility wrapper for legacy and DO-style just_once blocks.
+
+    New code should call special_block_decode() to handle just_once and skip
+    in one pass. The wrapper remains for existing callers and unit tests.
     """
-    Convert legacy and new just_once blocks to standard Fortran.
-
-    Legacy markers are preserved byte-for-byte in their historical output.
-    New syntax uses "if <just_once>" and "end if".
-
-    A stack distinguishes ordinary IF blocks from just_once blocks.
-    Nested just_once blocks (including mixed syntax) are not permitted.
-    """
-
-    output = []
-    stack = []
-
-    pat_begin = re.compile(r'^([^=]+)=+<just_once>=+(.*)$')
-    pat_end = re.compile(r'^([^=]+)=+</just_once>=+(.*)$')
-
-    pat_new_begin = re.compile(
-        r'^(\s*)if\s*<just_once>\s*$', re.IGNORECASE
-    )
-    # Treat a new-style skip block as an ordinary IF for nesting purposes.
-    # skip_counter() transforms it later in the pipeline.
-    pat_skip_begin = re.compile(
-        r'^\s*if\s*<skip\s+[A-Za-z]\w*\s*:\s*[^>\r\n]+>\s*$',
-        re.IGNORECASE
-    )
-    pat_if_begin = re.compile(
-        r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
-        re.IGNORECASE
-    )
-    pat_if_end = re.compile(
-        r'^\s*(?:end\s*if|endif)\s*$', re.IGNORECASE
-    )
-
-    for line in lines_in:
-        # Keep the existing legacy transformations unchanged.
-        match_begin = pat_begin.search(line)
-        match_end = pat_end.search(line)
-
-        if match_begin:
-            if 'just_once' in stack or 'legacy_just_once' in stack:
-                raise ValueError('Nested just_once blocks are not allowed')
-            stack.append('legacy_just_once')
-            s = match_begin.group(1)
-            s += 'if (just_once) then'
-            s += ' ' + match_begin.group(2)
-            s += '\n'
-            output.append(s)
-            continue
-
-        if match_end:
-            if not stack or stack[-1] != 'legacy_just_once':
-                raise ValueError('Mismatched legacy just_once end marker')
-            stack.pop()
-            s = match_end.group(1)
-            s += 'just_once = .false. ; end if'
-            s += ' ' + match_end.group(2)
-            s += '\n'
-            output.append(s)
-            continue
-
-        # Examine code only; preserve string contents and inline comments.
-        masked, comment_pos = mask_strings_and_comments(line)
-        code = line[:comment_pos].rstrip('\r\n')
-        comment = line[comment_pos:]
-        spaces_before_comment = code[len(code.rstrip(' \t')):]
-        code = code.rstrip(' \t')
-
-        newline = ''
-        if line.endswith('\r\n'):
-            newline = '\r\n'
-        elif line.endswith('\n'):
-            newline = '\n'
-        if newline and comment.endswith(newline):
-            comment = comment[:-len(newline)]
-
-        m = pat_new_begin.match(code)
-        if m:
-            if 'just_once' in stack or 'legacy_just_once' in stack:
-                raise ValueError('Nested just_once blocks are not allowed')
-            stack.append('just_once')
-            output.append(
-                m.group(1) + 'if (just_once) then'
-                + spaces_before_comment + comment + newline
-            )
-            continue
-
-        if pat_skip_begin.match(code):
-            stack.append('if')
-            output.append(line)
-            continue
-
-        if pat_if_begin.match(code):
-            stack.append('if')
-            output.append(line)
-            continue
-
-        if pat_if_end.match(code) and stack:
-            block_type = stack.pop()
-            if block_type == 'just_once':
-                indent = re.match(r'^\s*', code).group()
-                output.append(
-                    indent + 'just_once = .false. ; end if'
-                    + spaces_before_comment + comment + newline
-                )
-            elif block_type == 'legacy_just_once':
-                raise ValueError(
-                    'Mismatched just_once end: use ==</just_once>=='
-                )
-            else:
-                output.append(line)
-            continue
-
-        output.append(line)
-
-    if 'just_once' in stack or 'legacy_just_once' in stack:
-        raise ValueError('Unclosed just_once block')
-
-    return output
+    return special_block_decode(lines_in)
 
 
 #=============================================

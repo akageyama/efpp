@@ -7,9 +7,9 @@ program test_blocks
   integer :: n_output = 0
 
   do i = 1, 20
-    if <just_once>
+    do <just_once>
       n_initialize = n_initialize + 1
-    end if
+    end do
 
     if <skip counter:8>
       n_output = n_output + 1
