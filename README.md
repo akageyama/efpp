@@ -15,9 +15,9 @@ eFortran is **not a new compiler**. It is a thin preprocessing layer intended fo
 | `!debugp i` | `print *, 'i = ', i` | Print a labeled value with source location |
 | `real(DR) <in> :: dt` | `real(DR), intent(in) :: dt` | Short declaration attributes |
 | `do <just_once>` | `if (just_once) then` | One-time block (with a closing action) |
-| `if <skip counter:8>` | `if (mod(counter,8)==0) then` | Execute every eighth encounter (with a closing action) |
+| `do <every counter:8>` | `if (mod(counter,8)==0) then` | Execute every eighth encounter (with a closing action) |
 
-The `!debugp` translation shown above is schematic: efpp also includes the source location in the generated output. The last two rows show **opening lines only**. Their closing lines (`end do` for `just_once`, `end if` for `skip`) also generate code, as explained below.
+The `!debugp` translation shown above is schematic: efpp also includes the source location in the generated output. The last two rows show **opening lines only**. Their closing lines (`end do` for both blocks) also generate code, as explained below.
 
 ## Getting started
 
@@ -162,16 +162,16 @@ For compatibility, the original syntax is also supported:
 
 Both forms retain line-number correspondence. The previous `if <just_once>` spelling is no longer supported. Nested `just_once` blocks are not allowed; the unified block parser checks this and reports mismatched markers.
 
-### Periodic blocks: `skip`
+### Periodic blocks: `every`
 
 The recommended syntax is:
 
 ```fortran
 integer :: counter = 0
 
-if <skip counter:8>
+do <every counter:8>
   call write_output()
-end if
+end do
 ```
 
 This is equivalent to:
@@ -184,7 +184,7 @@ end if; counter = counter + 1
 
 The body executes when the counter is divisible by 8. **The counter is declared and initialized by your program**, not by efpp. The counter increments at the end of the block, whether or not the body executed. The starting value therefore matters: starting at 0 executes the body on the first encounter. Control transfers that bypass the closing increment can change this behavior.
 
-The original syntax remains supported:
+The original `skip` marker syntax remains supported:
 
 ```fortran
 ===<skip counter:8>===
@@ -192,7 +192,7 @@ The original syntax remains supported:
 ===</skip counter>===
 ```
 
-The current unified parser tracks `skip`, `just_once`, and ordinary block `if` and `do` statements together to match closing lines, including nested blocks. The old forms are maintained for existing code.
+The current unified parser tracks `every`, `just_once`, legacy `skip`, and ordinary block `if` and `do` statements together to match closing lines, including nested blocks. The previous `if <skip counter:8>` spelling is no longer supported. The legacy marker forms remain supported for existing code.
 
 ### Debug printing: `!debugp`
 
@@ -299,14 +299,14 @@ Run the Python unit tests from the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-The tests cover member access, compound assignments, lexical masking, CLI errors (including optional and explicitly specified alias files), and the old and new special-block syntaxes. An additional Fortran program at [`tests/test_blocks.ef`](tests/test_blocks.ef) checks the runtime behavior of `just_once` and `skip` after preprocessing and compilation.
+The tests cover member access, compound assignments, lexical masking, CLI errors (including optional and explicitly specified alias files), and the old and new special-block syntaxes. An additional Fortran program at [`tests/test_blocks.ef`](tests/test_blocks.ef) checks the runtime behavior of `just_once` and `every` after preprocessing and compilation.
 
 These tests and the sample program are useful regression checks, but they do not establish support for every legal Fortran construct.
 
 ## Limitations and compatibility
 
 - efpp is a **lightweight source-to-source preprocessor**, not a complete Fortran lexer or parser. Unusual continuation lines, complex nested syntax, and ambiguous user-defined dot operators may need care.
-- The new `do <just_once>` and `if <skip counter:8>` spellings are preferred. The older marker-based spellings remain supported for existing programs.
+- The new `do <just_once>` and `do <every counter:8>` spellings are preferred. The older marker-based `just_once` and `skip` spellings remain supported for existing programs. The earlier `if <skip counter:8>` spelling is not supported.
 - The special-block parser tracks a useful subset of Fortran block-`if` syntax. It is not a substitute for compiler syntax checking.
 - Most transformations (including `!debugp`) preserve the number and order of source lines. This is useful for diagnostics, but efpp does not produce formal source maps.
 - Output is intended for an ordinary Fortran compiler. Any compiler errors in the generated code still need to be resolved in the source or in the corresponding preprocessing rule.

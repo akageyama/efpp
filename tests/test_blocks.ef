@@ -11,14 +11,14 @@ program test_blocks
       n_initialize = n_initialize + 1
     end do
 
-    if <skip counter:8>
+    do <every counter:8>
       n_output = n_output + 1
-    end if
+    end do
   end do
 
   if (n_initialize /= 1) stop 1
   if (n_output /= 3) stop 2
   if (counter /= 20) stop 3
 
-  print *, "PASS: just_once and skip"
+  print *, "PASS: just_once and every"
 end program test_blocks

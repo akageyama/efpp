@@ -487,7 +487,7 @@ def subsdiary_call_decode(lines_in):
 #=============================================
 def special_block_decode(lines_in):
 #=============================================
-    """Translate DO-style just_once, IF-style skip, and legacy blocks.
+    """Translate DO-style just_once/every, and legacy blocks.
 
     Old marker spellings and their historical output formatting are preserved.
     Every source line produces exactly one output line. Ordinary Fortran IF
@@ -509,9 +509,12 @@ def special_block_decode(lines_in):
     new_once_begin = re.compile(
         r'^(\s*)do\s*<just_once>\s*$', re.IGNORECASE
     )
-    new_skip_begin = re.compile(
-        r'^(\s*)if\s*<skip\s+([A-Za-z][A-Za-z_0-9]*)\s*:\s*([^>\r\n]+?)\s*>\s*$',
+    new_every_begin = re.compile(
+        r'^(\s*)do\s*<every\s+([A-Za-z][A-Za-z_0-9]*)\s*:\s*([^>\r\n]+?)\s*>\s*$',
         re.IGNORECASE,
+    )
+    obsolete_skip_begin = re.compile(
+        r'^\s*if\s*<skip\b', re.IGNORECASE
     )
     ordinary_if_begin = re.compile(
         r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
@@ -625,10 +628,16 @@ def special_block_decode(lines_in):
                           + trailing + comment + newline)
             continue
 
-        m = new_skip_begin.match(code)
+        if obsolete_skip_begin.match(code):
+            raise ValueError(
+                f'Unsupported if <skip ...> at line {lineno}: '
+                'use do <every counter:interval> ... end do'
+            )
+
+        m = new_every_begin.match(code)
         if m:
             indent, counter, interval = m.groups()
-            stack.append(('skip', counter, lineno))
+            stack.append(('every', counter, lineno))
             output.append(indent + 'if(mod(' + counter + ','
                           + interval.strip() + ')==0) then'
                           + trailing + comment + newline)
@@ -649,12 +658,16 @@ def special_block_decode(lines_in):
                 output.append(line)  # Leave ordinary Fortran errors to compiler.
                 continue
             kind, _, _ = stack[-1]
-            if kind in ('if', 'skip', 'legacy_just_once', 'legacy_skip'):
+            if kind in ('if', 'legacy_just_once', 'legacy_skip'):
                 raise ValueError(f'Mismatched end do at line {lineno}')
             stack.pop()
             indent = re.match(r'^\s*', code).group()
             if kind == 'just_once':
                 output.append(indent + 'just_once = .false. ; end if'
+                              + trailing + comment + newline)
+            elif kind == 'every':
+                output.append(indent + 'end if; ' + counter + ' = '
+                              + counter + ' + 1'
                               + trailing + comment + newline)
             else:
                 output.append(line)
@@ -664,18 +677,13 @@ def special_block_decode(lines_in):
             if not stack:
                 output.append(line)  # Leave ordinary Fortran errors to compiler.
                 continue
-            kind, counter, _ = stack[-1]
-            if kind != 'if' and kind != 'skip':
+            kind, _, _ = stack[-1]
+            if kind != 'if':
                 raise ValueError(f'Mismatched end if at line {lineno}: '
                                  f'cannot close {kind} block')
             stack.pop()
             indent = re.match(r'^\s*', code).group()
-            if kind == 'skip':
-                output.append(indent + 'end if; ' + counter + ' = '
-                              + counter + ' + 1'
-                              + trailing + comment + newline)
-            else:
-                output.append(line)
+            output.append(line)
             continue
 
         output.append(line)
@@ -701,119 +709,13 @@ def just_once_region(lines_in):
 #=============================================
 def skip_counter(lines_in):
 #=============================================
-    """Translate legacy and IF-style skip blocks without changing line count.
+    """Compatibility wrapper for legacy skip and DO-style every blocks.
 
-    Legacy syntax (unchanged output):
-        ===<skip counter:8>===
-        ===</skip counter>===
-
-    New syntax:
-        if <skip counter:8>
-        end if
-
-    A stack tracks normal IF blocks and the counter associated with each
-    new-style skip block. Legacy markers keep their historical formatting.
+    Prefer special_block_decode() for new code; it handles all special blocks
+    with one stack. The old IF-style skip spelling is no longer supported.
     """
-    output = []
-    stack = []  # entries: (kind, counter) with kind 'if', 'skip', 'legacy_skip'
+    return special_block_decode(lines_in)
 
-    # Preserve the original legacy matching and formatting.
-    pat_begin = re.compile(r'^([^=]+)=+<skip\s+([a-zA-Z][a-zA-Z_0-9]*):(\s*.+)>=+(.*)$')
-    pat_end = re.compile(r'^([^=]+)=+</skip\s+([a-zA-Z][a-zA-Z_0-9]*)>=+(.*)$')
-
-    pat_new_begin = re.compile(
-        r'^(\s*)if\s*<skip\s+([A-Za-z][A-Za-z_0-9]*)\s*:\s*([^>\r\n]+?)\s*>\s*$',
-        re.IGNORECASE
-    )
-    pat_if_begin = re.compile(
-        r'^\s*(?:[A-Za-z]\w*\s*:\s*)?if\s*\(.*\)\s*then\s*$',
-        re.IGNORECASE
-    )
-    pat_if_end = re.compile(r'^\s*(?:end\s*if|endif)\s*$', re.IGNORECASE)
-    # just_once_region() runs before skip_counter() and generates this closing
-    # statement. It must close the corresponding IF on our stack too.
-    pat_just_once_end = re.compile(
-        r'^\s*just_once\s*=\s*\.false\.\s*;\s*end\s*if\s*$',
-        re.IGNORECASE
-    )
-
-    for line in lines_in:
-        legacy_begin = pat_begin.search(line)
-        legacy_end = pat_end.search(line)
-
-        if legacy_begin:
-            counter = legacy_begin.group(2)
-            stack.append(('legacy_skip', counter))
-            s = legacy_begin.group(1)
-            s += 'if(mod(' + counter
-            s += ',' + legacy_begin.group(3)
-            s += ')==0) then' + legacy_begin.group(4)
-            output.append(s + '\n')
-            continue
-
-        if legacy_end:
-            counter = legacy_end.group(2)
-            if not stack or stack[-1] != ('legacy_skip', counter):
-                raise ValueError('Mismatched legacy skip end marker')
-            stack.pop()
-            s = legacy_end.group(1)
-            s += 'end if; '
-            s += counter + ' = ' + counter + ' + 1'
-            s += ' ' + legacy_end.group(3)
-            output.append(s + '\n')
-            continue
-
-        masked, comment_pos = mask_strings_and_comments(line)
-        code = line[:comment_pos].rstrip('\r\n')
-        comment = line[comment_pos:]
-        spaces_before_comment = code[len(code.rstrip(' \t')):]
-        code = code.rstrip(' \t')
-
-        newline = '\r\n' if line.endswith('\r\n') else ('\n' if line.endswith('\n') else '')
-        if newline and comment.endswith(newline):
-            comment = comment[:-len(newline)]
-
-        m = pat_new_begin.match(code)
-        if m:
-            indent, counter, interval = m.groups()
-            stack.append(('skip', counter))
-            output.append(
-                indent + 'if(mod(' + counter + ',' + interval.strip()
-                + ')==0) then' + spaces_before_comment + comment + newline
-            )
-            continue
-
-        if pat_if_begin.match(code):
-            stack.append(('if', None))
-            output.append(line)
-            continue
-
-        if pat_just_once_end.match(code):
-            if stack and stack[-1][0] == 'if':
-                stack.pop()
-            output.append(line)
-            continue
-
-        if pat_if_end.match(code) and stack:
-            kind, counter = stack.pop()
-            if kind == 'skip':
-                indent = re.match(r'^\s*', code).group()
-                output.append(
-                    indent + 'end if; ' + counter + ' = ' + counter + ' + 1'
-                    + spaces_before_comment + comment + newline
-                )
-            elif kind == 'legacy_skip':
-                raise ValueError('Mismatched skip end: use ===</skip counter>===')
-            else:
-                output.append(line)
-            continue
-
-        output.append(line)
-
-    if any(kind != 'if' for kind, _ in stack):
-        raise ValueError('Unclosed skip block')
-
-    return output
 
 #=============================================
 def routine_name_macro(lines_in):

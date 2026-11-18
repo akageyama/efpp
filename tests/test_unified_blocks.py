@@ -16,11 +16,11 @@ class TestUnifiedBlocks(unittest.TestCase):
 
     def test_reverse_nesting(self):
         source = [
-            'if <skip counter:8>\n',
+            'do <every counter:8>\n',
             '  do <just_once>\n',
             '    call initialize()\n',
             '  end do\n',
-            'end if\n',
+            'end do\n',
         ]
         expected = [
             'if(mod(counter,8)==0) then\n',
@@ -48,7 +48,7 @@ class TestUnifiedBlocks(unittest.TestCase):
 
     def test_unclosed_skip_rejected(self):
         with self.assertRaises(ValueError):
-            special_block_decode(['if <skip ctr:8>\n', '  call output()\n'])
+            special_block_decode(['do <every ctr:8>\n', '  call output()\n'])
 
     def test_ordinary_do_contains_once(self):
         source = [
@@ -130,6 +130,40 @@ class TestUnifiedBlocks(unittest.TestCase):
         self.assertEqual(result[0], 'if (just_once) then\n')
         self.assertEqual(result[-1], 'just_once = .false. ; end if\n')
         self.assertEqual(result[1:-1], source[1:-1])
+
+    def test_old_if_skip_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'use do <every'):
+            special_block_decode(['if <skip counter:8>\n', 'end if\n'])
+
+    def test_every_with_comment(self):
+        source = ['do <every ctr:8> ! every eighth\n',
+                  '  call output()\n', 'end do  ! increment\n']
+        expected = ['if(mod(ctr,8)==0) then ! every eighth\n',
+                    '  call output()\n',
+                    'end if; ctr = ctr + 1  ! increment\n']
+        self.assertEqual(special_block_decode(source), expected)
+
+    def test_ordinary_do_contains_every(self):
+        source = ['do i = 1, 10\n', '  do <every ctr:2>\n',
+                  '    call output()\n', '  end do\n', 'end do\n']
+        expected = ['do i = 1, 10\n', '  if(mod(ctr,2)==0) then\n',
+                    '    call output()\n',
+                    '  end if; ctr = ctr + 1\n', 'end do\n']
+        self.assertEqual(special_block_decode(source), expected)
+
+    def test_every_contains_ordinary_do(self):
+        source = ['do <every ctr:3>\n', '  do i = 1, 2\n',
+                  '    call output()\n', '  end do\n', 'end do\n']
+        expected = ['if(mod(ctr,3)==0) then\n', '  do i = 1, 2\n',
+                    '    call output()\n', '  end do\n',
+                    'end if; ctr = ctr + 1\n']
+        self.assertEqual(special_block_decode(source), expected)
+
+    def test_crossed_if_every_rejected(self):
+        with self.assertRaises(ValueError):
+            special_block_decode(['do <every ctr:3>\n',
+                                  '  if (x) then\n',
+                                  'end do\n', 'end if\n'])
 
     def test_unclosed_do_once_rejected(self):
         with self.assertRaises(ValueError):
